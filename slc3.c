@@ -130,6 +130,7 @@ int controller (CPU_p cpu, ALU_p alu) {
                 case TRAP:
                   trapVector8 = (cpu->ir & TRAP_VECTOR8_FIELD) >> TRAP_VECTOR8_FIELD_SHIFT;
                   break;
+				case LEA:
                 case LD:
                   Rd = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
                   offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
@@ -138,6 +139,8 @@ int controller (CPU_p cpu, ALU_p alu) {
                   Rs1 = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
                   offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
                   break;
+				case RET:
+				case JSRR:
                 case JMP:
                   BaseR = (cpu->ir & RS1_FIELD) >> RS1_FIELD_SHIFT;
                   break;
@@ -212,6 +215,8 @@ int controller (CPU_p cpu, ALU_p alu) {
                     cpu->pc = cpu->pc + sext9(offset9);
                   }
                   break;
+				case RET:
+				case JSRR:
                 case JMP:
                   cpu->pc = cpu->reg_file[BaseR];
                   break;
@@ -232,6 +237,8 @@ int controller (CPU_p cpu, ALU_p alu) {
                   cpu->reg_file[Rd] = cpu->mdr;
                   setFlags(&cpu, &alu, opcode, Rd);
                   break;
+				case LEA:
+					cpu->reg_file[Rd] = cpu->pc + sext9(offset9);
                 case TRAP:
                   break;
               }

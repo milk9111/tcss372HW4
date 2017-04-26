@@ -19,6 +19,9 @@
 #define LD 2
 #define ST 3
 #define JMP 12
+#define JSRR 4
+#define LEA 14
+#define RET 12
 #define BR 0
 
 #define HALT 0x25
@@ -60,6 +63,7 @@
 #define LOAD 1
 #define STEP 3
 #define SHOW_MEM 5
+#define RUN 9
 #define EXIT 9
 
 #define START_MEM 0x3000
