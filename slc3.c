@@ -1,6 +1,6 @@
 /*
-	Author: Connor Lundberg, Vincent Povio
-	Date: 4/21/2017
+	Author: Connor Lundberg, Daniel Ivanov
+	Date: 4/25/2017
 	
 	The first version of our LC3 personal simulation. It takes a single command
 	and runs it through the controller, terminating with a HALT trap. We do this
@@ -8,7 +8,9 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
-#include "lc3.h"
+#include <unistd.h> 
+#include <termios.h> 
+#include "slc3.h"
 
 //current version
 
@@ -20,6 +22,29 @@ unsigned int memory[MAX_MEMORY];   // 32 words of memory enough to store simple 
 void initializeCPU(CPU_p *, ALU_p *);
 void display(CPU_p *, ALU_p *, int);
 void setFlags(CPU_p *, ALU_p *, Register, Register);
+
+
+
+ 
+char getch() {
+	char buf = 0;         
+	struct termios old = {0};         
+	if (tcgetattr(0, &old) < 0)                 
+		perror("tcsetattr()");         
+	old.c_lflag &= ~ICANON;         
+	old.c_lflag &= ~ECHO;         
+	old.c_cc[VMIN] = 1;         
+	old.c_cc[VTIME] = 0;         
+	if (tcsetattr(0, TCSANOW, &old) < 0)                 
+		perror("tcsetattr ICANON");        
+	if (read(0, &buf, 1) < 0)                 
+		perror ("read()");         
+	old.c_lflag |= ICANON;         
+	old.c_lflag |= ECHO;         
+	if (tcsetattr(0, TCSADRAIN, &old) < 0)                 
+		perror ("tcsetattr ~ICANON");         
+	return (buf); 
+}
 
 // This is the trap function that handles trap vectors. Acts as 
 // the trap vector table for now. Currently exits the HALT trap command.

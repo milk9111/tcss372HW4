@@ -1,6 +1,6 @@
 /*
-	Author: Connor Lundberg, Vincent Povio
-	Date: 4/21/2017
+	Author: Connor Lundberg, Daniel Ivanov
+	Date: 4/25/2017
 */
 
 #define FETCH 0
@@ -56,7 +56,7 @@
 
 #define LOAD 1
 #define STEP 3
-#define SHOR_MEM 5
+#define SHOW_MEM 5
 #define EXIT 9
 
 #define START_MEM 0x3000
