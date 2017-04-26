@@ -203,6 +203,8 @@ int controller (CPU_p cpu, ALU_p alu) {
 						return 0;
 					} else if (value > 1) {
 						charToPrint = (char) value;
+						cpu->out = charToPrint;
+						cpu->reg_file[Rd] = value;
 					}
                   break;
                 case BR: 
