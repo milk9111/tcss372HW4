@@ -1,6 +1,6 @@
 /*
 	Author: Connor Lundberg, Daniel Ivanov
-	Date: 4/25/2017
+	Date: 4/26/2017
 	
 	The first version of our LC3 personal simulation. It takes a single command
 	and runs it through the controller, terminating with a HALT trap. We do this
