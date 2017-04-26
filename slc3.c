@@ -16,7 +16,7 @@
 
 
 // you can define a simple memory module here for this program
-unsigned int memory[MAX_MEMORY];   // 32 words of memory enough to store simple program
+unsigned int memory[MAX_MEMORY];   // 500 words of memory enough to store simple program
 
 
 void initializeCPU(CPU_p *, ALU_p *);
@@ -49,11 +49,24 @@ char getch() {
 // This is the trap function that handles trap vectors. Acts as 
 // the trap vector table for now. Currently exits the HALT trap command.
 int trap(CPU_p cpu, ALU_p alu, int trap_vector) {
-
-	if (trap_vector == HALT) { //HALT
-		initializeCPU(&cpu, &alu);
-		return 0;
+	int value = 0;
+	switch (trap_vector) {
+		case GETC:
+			value = (int) getch();
+			break;
+		case OUT:
+			printf("");
+			break;
+		case PUTS:
+			printf("%c", cpu->out);
+			break;
+		case HALT:
+			initializeCPU(&cpu, &alu);
+			value = 1;
+			break;
 	}
+	
+	return value;
 }
 
 
@@ -79,6 +92,9 @@ int controller (CPU_p cpu, ALU_p alu) {
 	Register opcode, Rd, Rs1, Rs2, immed5, offset9;	// fields for the IR
 	Register effective_addr, trapVector8, BaseR;
 	char *nextLine = malloc (sizeof(char));
+	char charToPrint = ' ';
+	int value = 0;
+	
   initializeCPU(&cpu, &alu);
     int state = FETCH, BEN;
     for (;;) {
@@ -182,9 +198,12 @@ int controller (CPU_p cpu, ALU_p alu) {
                   setFlags(&cpu, &alu, opcode, Rd);
                   break;
                 case TRAP:
-                  if (!trap(cpu, alu, cpu->mar)) {
-					return 0;
-				  }
+					value = trap(cpu, alu, cpu->mar);
+					if (value == 1) {
+						return 0;
+					} else if (value > 1) {
+						charToPrint = (char) value;
+					}
                   break;
                 case BR: 
                   if (BEN) {

@@ -22,10 +22,13 @@
 #define BR 0
 
 #define HALT 0x25
+#define GETC 0x20
+#define OUT 0x21
+#define PUTS 0x22
 
 #define NO_OF_REGISTERS 8
 
-#define MAX_MEMORY 32
+#define MAX_MEMORY 500
 
 #define OPCODE_FIELD 0xF000				// 1111 0000 0000 0000 - gets first three bits
 #define OPCODE_FIELD_SHIFT 12
@@ -82,6 +85,7 @@ typedef struct cpu_s {
 	Register mdr;
 	Register reg_file[NO_OF_REGISTERS];
 	Register memory_start;
+	char out;
 	int n, z, p;
 } CPU_s;
 
