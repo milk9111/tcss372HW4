@@ -42,8 +42,8 @@
 	CONT		AND R2, R2, #0
 			STR R2, R1, #0
 
-			;LEA R0, HELLO  ;Used as test to print name back
-			;PUTS		; Printing name
+			LEA R0, HELLO  ;Used as test to print name back
+			PUTS		; Printing name
 	
 			AND R1, R1, #0
 		JSRR R1	
