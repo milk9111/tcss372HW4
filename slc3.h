@@ -21,7 +21,6 @@
 #define JMP 12
 #define JSRR 4
 #define LEA 14
-#define RET 12
 #define BR 0
 
 #define HALT 0x25

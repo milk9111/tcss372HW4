@@ -139,7 +139,6 @@ int controller (CPU_p cpu, ALU_p alu) {
                   Rs1 = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
                   offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
                   break;
-				case RET:
 				case JSRR:
                 case JMP:
                   BaseR = (cpu->ir & RS1_FIELD) >> RS1_FIELD_SHIFT;
@@ -215,7 +214,6 @@ int controller (CPU_p cpu, ALU_p alu) {
                     cpu->pc = cpu->pc + sext9(offset9);
                   }
                   break;
-				case RET:
 				case JSRR:
                 case JMP:
                   cpu->pc = cpu->reg_file[BaseR];
