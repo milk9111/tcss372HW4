@@ -42,18 +42,37 @@
 	CONT		AND R2, R2, #0
 			STR R2, R1, #0
 
-			LEA R0, HELLO  ;Used as test to print name back
-			PUTS		; Printing name
+			;LEA R0, HELLO   	; Used as test to print name back
+			;PUTS		 	; Printing name
 	
-			AND R1, R1, #0
-		JSRR R1	
+			LEA R1, NAME
+			LD R2, KEY
+			
+			
+			
+JSRR R1	
+	LOOP		
+			LDR R3, R1, #0		; Load contents of [index R1] into R3		
+
+			ADD R3, R3, R2		; Change contents of R3 to R3 + key
+
+			AND R6, R6, #0		; Loop Check for #-3
+			ADD R6, R3, #3
+			BRz DONE
+
+			ADD R1, R1, #1		; Increment to next index [R1 + 1]
 			
 
 
-		HALT
+	DONE
 
+			LEA R0, HELLO   	 ; Used as test to print name back
+			PUTS		 	 ; Printing name
+
+		HALT
+KEY		.FILL #-3
 NEGENTER	.FILL xFFF6	
 PROMPT		.STRINGZ "Please enter your name: "
 HELLO 		.STRINGZ "Hello, "
-		.BLKW #20 #8
+NAME		.BLKW #20 
 		.END
