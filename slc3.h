@@ -62,7 +62,8 @@
 #define LOAD 1
 #define STEP 3
 #define SHOW_MEM 5
-#define RUN 9
+#define RUN 7
+#define CLEAR 8
 #define EXIT 9
 
 #define START_MEM 0x3000

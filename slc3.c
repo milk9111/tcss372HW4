@@ -61,7 +61,8 @@ int trap(CPU_p cpu, ALU_p alu, int trap_vector) {
 			printf("%c", cpu->out);
 			break;
 		case HALT:
-			initializeCPU(&cpu, &alu);
+			printf ("\n\nREACHED HALT\n\n");
+			//initializeCPU(&cpu, &alu);
 			value = 1;
 			break;
 	}
@@ -86,7 +87,7 @@ int sext9(int offset9) {
 
 // This is the main controller for our CPU. It is complete with all microstates
 // defined for this project.
-int controller (CPU_p cpu, ALU_p alu) {
+int controller (CPU_p cpu, ALU_p alu, int isRunning) {
     // check to make sure both pointers are not NULL
     // do any initializations here
 	Register opcode, Rd, Rs1, Rs2, immed5, offset9;	// fields for the IR
@@ -100,9 +101,11 @@ int controller (CPU_p cpu, ALU_p alu) {
     for (;;) {
         switch (state) {
             case FETCH:
-			  display(&cpu, &alu, 0);
-			  scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
-										//Probably a better way to do this.
+				if (!isRunning) {
+					display(&cpu, &alu, 0);
+					scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
+											//Probably a better way to do this.
+				}
               cpu->mar = cpu->pc;
               cpu->pc++;
               cpu->mdr = memory[cpu->mar];
@@ -241,12 +244,17 @@ int controller (CPU_p cpu, ALU_p alu) {
                   break;
               }
               state = FETCH;
-              //display(&cpu, &alu);
               break;
         }
     }
 	free(nextLine);
 	return 0;
+}
+
+
+
+void clearMem() {
+	for (int i = 0; i < MAX_MEMORY; i++) {memory[i] = 0x0;}
 }
 
 
@@ -269,16 +277,21 @@ int main (int argc, char* argv[]) {
     display(&cpu, &alu, 1);
     scanf("%d", &response);
     if (response == LOAD) {
+		n = 1;
+		clearMem();
       printf(" File name: ");
       scanf("%s", file_name);
       infile = fopen(file_name, "r");
       if (infile != NULL) {
-        while (fscanf(infile, "%X", &memory[n-1]) != EOF && n < MAX_MEMORY) { n++; } ;
+        while (fscanf(infile, "%X", &memory[n-1]) != EOF && n < MAX_MEMORY) { 
+			printf ("\n\nIN HERE\n\n");
+			printf ("memory[%d-1] = %X\n", n, memory[n-1]);
+			n++; } ;
       } else {
         printf("ERROR: File not found. Press <ENTER> to continue.");
       }
     } else if (response == STEP) {
-	  controller (cpu, alu);
+	  controller (cpu, alu, 0);
 	} else if (response == SHOW_MEM) {
 	  printf ("Starting Address: ");
 	  scanf("%X", &newAddress);
@@ -290,6 +303,10 @@ int main (int argc, char* argv[]) {
 	  } else {
 		printf ("Not a valid address <ENTER> to continue.");
 	  }
+	} else if (response == RUN) {
+		controller (cpu, alu, 1);
+	} else if (response == CLEAR) {
+		initializeCPU(&cpu, &alu);
 	}
   }
 	
@@ -329,7 +346,7 @@ void display(CPU_p *cpu, ALU_p *alu, int showChoices) {
   printf("\tCC: N:%i Z:%i P:%i\t\t\tX%04X: X%04X\n", (*cpu)->n, (*cpu)->z, (*cpu)->p, (*cpu)->memory_start + 14, memory[disp_mem + 14]);
   printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 15, memory[disp_mem + 15]);
   if (showChoices) {
-	printf("Select: 1) Load, 3) Step, 5) Display Mem, 9)Exit\n");
+	printf("Select: 1) Load, 3) Step, 5) Display Mem, 7) Run, 8) Clear, 9)Exit\n");
   }
   printf(">");
 }
