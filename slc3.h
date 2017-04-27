@@ -69,7 +69,7 @@
 #define START_MEM 0x3000
 #define END_MEM 0x301F
 
-#define DISPLAY_HELP 12288
+#define DISPLAY_HELP 12287
 
 
 typedef unsigned short Register;

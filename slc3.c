@@ -20,7 +20,7 @@ unsigned int memory[MAX_MEMORY];   // 500 words of memory enough to store simple
 
 
 void initializeCPU(CPU_p *, ALU_p *);
-void display(CPU_p *, ALU_p *, int);
+void display(CPU_p *, ALU_p *, int, int);
 void setFlags(CPU_p *, ALU_p *, Register, Register);
 
 
@@ -61,8 +61,6 @@ int trap(CPU_p cpu, ALU_p alu, int trap_vector) {
 			printf("%c", cpu->out);
 			break;
 		case HALT:
-			printf ("\n\nREACHED HALT\n\n");
-			//initializeCPU(&cpu, &alu);
 			value = 1;
 			break;
 	}
@@ -88,28 +86,40 @@ int sext9(int offset9) {
 // This is the main controller for our CPU. It is complete with all microstates
 // defined for this project.
 int controller (CPU_p cpu, ALU_p alu, int isRunning) {
-    // check to make sure both pointers are not NULL
-    // do any initializations here
 	Register opcode, Rd, Rs1, Rs2, immed5, offset9;	// fields for the IR
 	Register effective_addr, trapVector8, BaseR;
 	char *nextLine = malloc (sizeof(char));
 	char charToPrint = ' ';
-	int value = 0;
+	int value = 0, start = 1;
 	
-  initializeCPU(&cpu, &alu);
-    int state = FETCH, BEN;
+    initializeCPU(&cpu, &alu);
+		   
+	if (!isRunning) {
+		cpu->ir = memory[cpu->pc];
+		cpu->pc++;
+		display(&cpu, &alu, 0, 0);
+		scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
+								//Probably a better way to do this.
+	}
+    int state = FETCH, BEN = 0;
     for (;;) {
         switch (state) {
             case FETCH:
-				if (!isRunning) {
-					display(&cpu, &alu, 0);
-					scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
-											//Probably a better way to do this.
+				if (!start) {
+					//printf ("\n\nIR BEFORE: %X\n\n", cpu->ir);
+					cpu->mar = cpu->pc;
+					cpu->pc++;
+					cpu->mdr = memory[cpu->mar];
+					cpu->ir = cpu->mdr;
+					//printf ("\n\nIR AFTER: %X\n\n", cpu->ir);
+					if (!isRunning) {
+						scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
+												//Probably a better way to do this.
+						display(&cpu, &alu, 0, 0);
+						
+					}
+				  
 				}
-              cpu->mar = cpu->pc;
-              cpu->pc++;
-              cpu->mdr = memory[cpu->mar];
-              cpu->ir = cpu->mdr;
               state = DECODE;
               break;
             case DECODE:
@@ -148,9 +158,10 @@ int controller (CPU_p cpu, ALU_p alu, int isRunning) {
                   break;
                 case BR:
                   offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
+				  printf("\n\n IN BRANCH decode\n\n");
                   break;
               }
-              BEN = ((cpu->ir & N_CHECK) & cpu->n) | ((cpu->ir & Z_CHECK) & cpu->z) | ((cpu->ir & P_CHECK) & cpu->p);  
+              BEN = ((cpu->ir & N_CHECK) && cpu->n) || ((cpu->ir & Z_CHECK) && cpu->z) || ((cpu->ir & P_CHECK) && cpu->p);  
               state = EVAL_ADDR;
               break;
             case EVAL_ADDR:
@@ -214,8 +225,14 @@ int controller (CPU_p cpu, ALU_p alu, int isRunning) {
                   break;
                 case BR: 
                   if (BEN) {
+					  printf("\n\n IN BRANCH execute\n\n");
+					  printf("\nPC: %4X ", cpu->pc);
+					  printf("    SEXT(OFFSET9): %4X\n", sext9(offset9));
+					  printf("%4X + %4X = %4X\n\n", cpu->pc, sext9(offset9), cpu->pc + sext9(offset9));
                     cpu->pc = cpu->pc + sext9(offset9);
-                  }
+                  } else {
+					printf ("\n\nBEN not enabled\n\n");
+				  }
                   break;
 				case JSRR:
                 case JMP:
@@ -244,6 +261,8 @@ int controller (CPU_p cpu, ALU_p alu, int isRunning) {
                   break;
               }
               state = FETCH;
+				//printf ("\n\n REACHED END\n\n");
+				if (start) start = 0;
               break;
         }
     }
@@ -272,9 +291,9 @@ int main (int argc, char* argv[]) {
 	ALU_p alu = malloc (sizeof(ALU_s));
 
   initializeCPU(&cpu, &alu);
-
+	
   while (response != EXIT) {
-    display(&cpu, &alu, 1);
+    display(&cpu, &alu, 1, 1);
     scanf("%d", &response);
     if (response == LOAD) {
 		n = 1;
@@ -283,10 +302,7 @@ int main (int argc, char* argv[]) {
       scanf("%s", file_name);
       infile = fopen(file_name, "r");
       if (infile != NULL) {
-        while (fscanf(infile, "%X", &memory[n-1]) != EOF && n < MAX_MEMORY) { 
-			printf ("\n\nIN HERE\n\n");
-			printf ("memory[%d-1] = %X\n", n, memory[n-1]);
-			n++; } ;
+        while (fscanf(infile, "%X", &memory[n-1]) != EOF && n < MAX_MEMORY) { n++; } ;
       } else {
         printf("ERROR: File not found. Press <ENTER> to continue.");
       }
@@ -299,7 +315,7 @@ int main (int argc, char* argv[]) {
 	  if (newAddress >= START_MEM && newAddress <= (END_MEM - 16)) {
 		  
 		cpu->memory_start = newAddress;
-		display(&cpu, &alu, 1);
+		display(&cpu, &alu, 1, 1);
 	  } else {
 		printf ("Not a valid address <ENTER> to continue.");
 	  }
@@ -321,7 +337,7 @@ int main (int argc, char* argv[]) {
 //It takes in the CPU, ALU, and an int showChoices that just changes 
 //whether the console will display the choices bar at the bottom or not.
 //(when using step)
-void display(CPU_p *cpu, ALU_p *alu, int showChoices) {
+void display(CPU_p *cpu, ALU_p *alu, int showChoices, int start) {
   int disp_mem = ((int) (*cpu)->memory_start) - DISPLAY_HELP;
   if (showChoices) {
 	printf("\n\tWelcome to the LC-3 Simulator Simulator\n");
@@ -340,7 +356,7 @@ void display(CPU_p *cpu, ALU_p *alu, int showChoices) {
   printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 8, memory[disp_mem + 8]);
   printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 9, memory[disp_mem + 9]);
   printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 10, memory[disp_mem + 10]);
-  printf("\t PC: X%4X\t IR: X%04X\tX%04X: X%04X\n", (*cpu)->pc + START_MEM, (*cpu)->ir, (*cpu)->memory_start + 11, memory[disp_mem + 11]);
+  printf("\t PC: X%4X\t IR: X%04X\tX%04X: X%04X\n", ((*cpu)->pc - 1) + START_MEM, (*cpu)->ir, (*cpu)->memory_start + 11, memory[disp_mem + 11]);
   printf("\t  A: X%04X\t  B: X%04X\tX%04X: X%04X\n", (*alu)->a, (*alu)->b, (*cpu)->memory_start + 12, memory[disp_mem + 12]);
   printf("\tMAR: X%04X\tMDR: X%04X\tX%04X: X%04X\n", (*cpu)->mar, (*cpu)->mdr, (*cpu)->memory_start + 13, memory[disp_mem + 13]);
   printf("\tCC: N:%i Z:%i P:%i\t\t\tX%04X: X%04X\n", (*cpu)->n, (*cpu)->z, (*cpu)->p, (*cpu)->memory_start + 14, memory[disp_mem + 14]);
@@ -362,7 +378,10 @@ void initializeCPU(CPU_p *cpu, ALU_p *alu) {
   (*cpu)->reg_file[5] = 5;
   (*cpu)->reg_file[6] = 6;
   (*cpu)->reg_file[7] = 0xA;
-  (*cpu)->pc = 0;
+  
+  (*cpu)->pc = 1;	//Need to increment PC here so the instructions start at x3001 as to skip
+					//the instruction x3000 at position x3000. It will show the value of x3001
+					//at x3000 though.
   (*cpu)->ir = 0;
   (*cpu)->mar = 0;
   (*cpu)->mdr = 0;
