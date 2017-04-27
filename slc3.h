@@ -21,7 +21,6 @@
 #define JMP 12
 #define JSRR 4
 #define LEA 14
-#define RET 12
 #define BR 0
 
 #define HALT 0x25
@@ -63,13 +62,14 @@
 #define LOAD 1
 #define STEP 3
 #define SHOW_MEM 5
-#define RUN 9
+#define RUN 7
+#define CLEAR 8
 #define EXIT 9
 
 #define START_MEM 0x3000
 #define END_MEM 0x301F
 
-#define DISPLAY_HELP 12288
+#define DISPLAY_HELP 12287
 
 
 typedef unsigned short Register;
