@@ -174,7 +174,7 @@ int controller (CPU_p cpu) {
 								//0x01ff
 								immed_offset = cpu->ir & 0x01ff;
 								
-								BaseR = cpu->ir & 0x01C0;
+								BaseR = cpu->ir & 0x01C0 >> 6;
 
                 // make sure opcode is in integer form
 				// hint: use four unsigned int variables, opcode, Rd, Rs, and immed7
@@ -184,7 +184,9 @@ int controller (CPU_p cpu) {
             case EVAL_ADDR: // Look at the LD instruction to see microstate 2 example
                 switch (opcode) {
 									case LDR:
-										cpu->MAR = cpu->r[ + 
+										printf ("BaseR: %d\n", BaseR);
+										cpu->MAR = cpu->r[BaseR] + sext6(immed_offset);
+										break;
 									case LD:
 										cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
 										//printf("PC: %d, IMM: %d", (cpu->PC - 0x2FF), immed_offset);
