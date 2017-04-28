@@ -29,6 +29,7 @@
 			BR AGAIN
 	NEXT		LEA R0, PROMPT
 			PUTS
+			ADD R1, R1, #1
 			LD R3, NEGENTER
 		
 	AGAIN2 		GETC
@@ -41,38 +42,50 @@
 			BR AGAIN2
 	CONT		AND R2, R2, #0
 			STR R2, R1, #0
-
-			;LEA R0, HELLO   	; Used as test to print name back
-			;PUTS		 	; Printing name
 	
 			LEA R1, NAME
 			LD R2, KEY
+			AND R3, R3, #0
 			
+			AND R0, R0, #0
+			ADD R0, R0, xD		; Carriage return char			
+			OUT
+			AND R0, R0, #0
+			ADD R0, R0, xA		; New Line char			
+			OUT
+			ADD R7, R7, #1
 			
-			
-JSRR R1	
+JSRR R7	
 	LOOP		
 			LDR R3, R1, #0		; Load contents of [index R1] into R3		
 
 			ADD R3, R3, R2		; Change contents of R3 to R3 + key
+			
 
 			AND R6, R6, #0		; Loop Check for #-3
 			ADD R6, R3, #3
 			BRz DONE
-
+			
+			STR R3, R1, #0		; Store contents of R3 back into Array
 			ADD R1, R1, #1		; Increment to next index [R1 + 1]
+			BR LOOP
 			
 
 
 	DONE
+			
 
-			LEA R0, HELLO   	 ; Used as test to print name back
-			PUTS		 	 ; Printing name
+			
+			LEA R0, HELLO   	 ; 
+			PUTS		 	 ; Printing Hello
+			GETC
+			LEA R0, NAME		 ;
+			PUTS			 ; Printing Encrypted Name
 
 		HALT
 KEY		.FILL #-3
 NEGENTER	.FILL xFFF6	
 PROMPT		.STRINGZ "Please enter your name: "
-HELLO 		.STRINGZ "Hello, "
+HELLO 		.STRINGZ "Press any key to continue\n"
 NAME		.BLKW #20 
 		.END
