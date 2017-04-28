@@ -23,7 +23,7 @@
 
 		.ORIG x3000
 			LEA R1, HELLO
-	AGAIN		LDR R2, R1, #0
+	AGAIN	 	LDR R2, R1, #0
 			BRz NEXT
 			ADD R1, R1, #1
 			BR AGAIN
