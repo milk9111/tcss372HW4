@@ -1,25 +1,29 @@
 /*
- * Addison Sims
- * Daniel Ivanov
+ * Authors: Connor Lundberg, Daniel Ivanov
+ * Date: 4/28/2017
  */
 #include "slc3.h"
 
-int controller (CPU_p cpu);
+int controller (CPU_p);
 
-int displayScreen(CPU_p cpu, int mem);
+int displayScreen (CPU_p, int);
 
-int dialog(CPU_p cpu);
+int dialog (CPU_p cpu);
+
+char getch ();
+
+void setFlags (CPU_p, unsigned int, unsigned int, unsigned int);
 
 
 // you can define a simple memory module here for this program
-unsigned short memory[32];   // 32 words of memory enough to store simple program
+unsigned short memory[MAX_MEMORY];   // 500 words of memory enough to store simple program
 int isLoaded;
 int memShift;
 
 
 int sext6(int offset6) {
 	if (HIGH_ORDER_BIT_VALUE6 & offset6) return (offset6 | SEXT6_SIGN_EXTEND);
-	else return offset6;
+	else return offset6 & 0x003F;
 }
 
 
@@ -28,8 +32,74 @@ int sext9(int offset9) {
 	else return offset9;
 }
 
-int displayScreen(CPU_p cpu, int mem) {
 
+// This is the trap function that handles trap vectors. Acts as 
+// the trap vector table for now. Currently exits the HALT trap command.
+int trap(CPU_p cpu, int trap_vector) {
+	int value = 0;
+	switch (trap_vector) {
+		case GETC:
+			value = (int) getch();
+			break;
+		case OUT:
+			printf("");
+			break;
+		case PUTS:
+			printf("%c", cpu->out);
+			break;
+		case HALT:
+			value = 1;
+			break;
+	}
+	
+	return value;
+}
+
+
+void chooseFlag (CPU_p cpu, int cc) {
+	printf ("\n\n IN chooseFlag \n\n");
+	if (cc < 0x0000){
+		setFlags(cpu, 1, 0, 0);
+	}
+	if (cc == 0x0000){
+		setFlags(cpu, 0, 1, 0);
+	}
+	if (cc > 0x0000){
+		setFlags(cpu, 0, 0, 1);
+	}
+}
+	
+
+void setFlags (CPU_p cpu, unsigned int neg, unsigned int zero, unsigned int pos) {
+	printf ("\n\n IN setFlags \n\n");
+	cpu->N = neg;
+	cpu->Z = zero;
+	cpu->P = pos;
+}
+
+
+char getch() {
+	char buf = 0;         
+	struct termios old = {0};         
+	if (tcgetattr(0, &old) < 0)                 
+		perror("tcsetattr()");         
+	old.c_lflag &= ~ICANON;         
+	old.c_lflag &= ~ECHO;         
+	old.c_cc[VMIN] = 1;         
+	old.c_cc[VTIME] = 0;         
+	if (tcsetattr(0, TCSANOW, &old) < 0)                 
+		perror("tcsetattr ICANON");        
+	if (read(0, &buf, 1) < 0)                 
+		perror ("read()");         
+	old.c_lflag |= ICANON;         
+	old.c_lflag |= ECHO;         
+	if (tcsetattr(0, TCSADRAIN, &old) < 0)                 
+		perror ("tcsetattr ~ICANON");         
+	return (buf); 
+}
+
+
+int displayScreen(CPU_p cpu, int mem) {
 	printf("\t\tWelcome to the LC-3 Simulator Simulator\n\n");
 	printf("\t\tRegisters \t\t    Memory\n");
 //	for (int i = 0x0000; i < 8; i++) {
@@ -40,25 +110,25 @@ int displayScreen(CPU_p cpu, int mem) {
 //		}
 //	}
 	int i = 0x3000 + mem;
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 0, cpu->r[0], i, memory[1]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 0, cpu->r[0], i, memory[1 + mem]);
 
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 1, cpu->r[1], i+1, memory[2]);
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 2, cpu->r[2], i+2, memory[3]);
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 3, cpu->r[3], i+3, memory[4]);
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 4, cpu->r[4], i+4, memory[5]);
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 5, cpu->r[5], i+5, memory[6]);
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 6, cpu->r[6], i+6, memory[7]);
-	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 7, cpu->r[7], i+7, memory[8]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 1, cpu->r[1], i+1, memory[2 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 2, cpu->r[2], i+2, memory[3 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 3, cpu->r[3], i+3, memory[4 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 4, cpu->r[4], i+4, memory[5 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 5, cpu->r[5], i+5, memory[6 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 6, cpu->r[6], i+6, memory[7 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 7, cpu->r[7], i+7, memory[8 + mem]);
 
 	i = 0x3008 + mem; // replace i with the mem dump number if you want.
-	printf("\t\t\t\t\t x%X: x%04X\n",i, memory[9]);
-	printf("\t\t\t\t\t x%X: x%04X\n",i+1, memory[10]);
-	printf("\t\t\t\t\t x%X: x%04X\n",i+2, memory[11]);
-	printf("\t\tPC:x%0.4X    IR:x%04X     x%X: x%04X\n",cpu->PC,cpu->ir,i+3, memory[12]);
-	printf("\t\tA: x%04X    B: x%04X     x%X: x%04X\n",cpu->A,cpu->B,i+4, memory[13]);
-	printf("\t\tMAR:x%04X  MDR:x%04X     x%X: x%04X\n",cpu->MAR + 0x2FFF,cpu->MDR,i+5, memory[14]);
-	printf("\t\tCC: N: %d  Z: %01d P: %d      x%X: x%04X\n",cpu->N,cpu->Z,cpu->P,i+6, memory[15]);
-	printf("\t\t\t\t\t x%X: x%04X\n",i+7, memory[16]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i, memory[9 + mem]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i+1, memory[10 + mem]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i+2, memory[11 + mem]);
+	printf("\t\tPC:x%0.4X    IR:x%04X     x%X: x%04X\n",cpu->PC,cpu->ir,i+3, memory[12 + mem]);
+	printf("\t\tA: x%04X    B: x%04X     x%X: x%04X\n",cpu->A,cpu->B,i+4, memory[13 + mem]);
+	printf("\t\tMAR:x%04X  MDR:x%04X     x%X: x%04X\n",cpu->MAR + 0x2FFF,cpu->MDR,i+5, memory[14 + mem]);
+	printf("\t\tCC: N: %d  Z: %01d P: %d      x%X: x%04X\n",cpu->N,cpu->Z,cpu->P,i+6, memory[15 + mem]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i+7, memory[16 + mem]);
 	printf("  Select: 1)Load, 3)Step, 5)Display Mem, 9)Exit\n");
 	return 0;
 }
@@ -103,12 +173,15 @@ int dialog(CPU_p cpu) {
 					printf("How much would you like to shift?:");
 
 					scanf("%d", &memShift);
-					if(memShift > 17) {
+					if(memShift > MAX_MEMORY - 17) {
 						printf("Error: out of memory");
 						memShift = 0;
 						break;
 					} else {
 						displayScreen(cpu, memShift);
+						for (int i = 0; i < MAX_MEMORY; i++) {
+							printf("i: %d    %4X\n", i, memory[i]);
+						}
 					}
 					//printf("About to send to displayScreen()\n");
 
@@ -120,12 +193,18 @@ int dialog(CPU_p cpu) {
 			}
 		}
 }
+
+
+
+
 int controller (CPU_p cpu) {
     // check to make sure both pointers are not NULL
     // do any initializations here
 		unsigned int state;
 		short cc;
 	unsigned int opcode, Rd, Rs1, Rs2, immed_offset, BaseR;	// fields for the IR
+	char charToPrint = ' ';
+	int value = 0;
     state = FETCH;
 		int j;
 		//for(;;){
@@ -158,23 +237,24 @@ int controller (CPU_p cpu) {
 						// microstate 32
                 // get the fields out of the IR
             	//printf("IM HERE");
-								opcode = cpu->ir >> 12;
+				opcode = cpu->ir >> 12;
 
-								//0x0fff
-								Rd = cpu->ir & 0x0fff;
-								Rd = (short)Rd >> 9;
+				//0x0fff
+				Rd = cpu->ir & 0x0fff;
+				Rd = (short)Rd >> 9;
 
-								//0x01ff
-								Rs1 = cpu->ir & 0x01ff;
-								Rs1 = (short)Rs1 >> 6;
+				//0x01ff
+				Rs1 = cpu->ir & 0x01ff;
+				Rs1 = (short)Rs1 >> 5;
 
-								//0x0007
-								Rs2 = cpu->ir & 0x0007;
+				//0x0007
+				Rs2 = cpu->ir & 0x0007;
 
-								//0x01ff
-								immed_offset = cpu->ir & 0x01ff;
-								
-								BaseR = cpu->ir & 0x01C0 >> 6;
+				//0x01ff
+				immed_offset = cpu->ir & 0x01ff;
+				
+				printf ("\n\n IR: %4X\n\n", cpu->ir);
+				BaseR = (cpu->ir & 0x01C0) >> 6;
 
                 // make sure opcode is in integer form
 				// hint: use four unsigned int variables, opcode, Rd, Rs, and immed7
@@ -183,19 +263,29 @@ int controller (CPU_p cpu) {
                 //break;
             case EVAL_ADDR: // Look at the LD instruction to see microstate 2 example
                 switch (opcode) {
-									case LDR:
-										printf ("BaseR: %d\n", BaseR);
-										cpu->MAR = cpu->r[BaseR] + sext6(immed_offset);
-										break;
-									case LD:
-										cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
-										//printf("PC: %d, IMM: %d", (cpu->PC - 0x2FF), immed_offset);
-										//cpu->r[Rd] = memory[cpu->PC + immed-offset]
-										break;
-									case ST:
-										cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
-										//memory[cpu->PC + immed-offset] = Rd
-										break;
+					case LDR:
+						printf ("BaseR: %d\n", BaseR);
+						printf ("sext: %4X\n", sext6(immed_offset));
+						printf ("r[%d]: %4X\n", BaseR, cpu->r[BaseR]);
+						printf ("%4X + %4X = %4X\n", cpu->r[BaseR], sext6(immed_offset), cpu->r[BaseR] + sext6(immed_offset));
+						printf ("%4X - %4X = %4X\n", cpu->r[BaseR] + sext6(immed_offset), 0x3008, (cpu->r[BaseR] + sext6(immed_offset)) - 0x3008);
+
+						cpu->MAR = (cpu->r[BaseR] + sext6(immed_offset)) - 0x3008;
+						printf ("cpu->MAR: 0x%4X\n\n", cpu->MAR);
+						printf ("cpu->MAR: %d\n\n", cpu->MAR);
+						break;
+					case LD:
+						cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
+						//printf("PC: %d, IMM: %d", (cpu->PC - 0x2FF), immed_offset);
+						//cpu->r[Rd] = memory[cpu->PC + immed-offset]
+						break;
+					case ST:
+						cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
+						//memory[cpu->PC + immed-offset] = Rd
+						break;
+					case TRAP:
+						cpu->MAR = immed_offset & 0x00ff;
+						break;
                 // different opcodes require different handling
                 // compute effective address, e.g. add sext(immed7) to register
                 }
@@ -203,37 +293,42 @@ int controller (CPU_p cpu) {
                 //break;
             case FETCH_OP: // Look at ST. Microstate 23 example of getting a value out of a register
                 switch (opcode) {
-									case LD:
-									//	printf("MAR: %d", cpu->MAR);
-									  cpu->MDR = memory[cpu->MAR];
-										break;
-									case ADD:
-										if(0x0020 & cpu->ir){ //0000|0000|0010|0000
-											cpu->A = cpu->r[Rs1];
-											cpu->B = (immed_offset & 0x001f);
-										} else{
-											cpu->A = cpu->r[Rs1];
-											cpu->B = cpu->r[Rs2];
-										}
+					case LDR:
+					case LD:
+					//	printf("MAR: %d", cpu->MAR);
+					  cpu->MDR = memory[cpu->MAR];
+					  printf ("cpu->MDR: %4X\n\n", cpu->MDR);
+						break;
+					case ADD:
+						if(0x0020 & cpu->ir){ //0000|0000|0010|0000
+							cpu->A = cpu->r[Rs1];
+							cpu->B = (immed_offset & 0x001f);
+						} else{
+							cpu->A = cpu->r[Rs1];
+							cpu->B = cpu->r[Rs2];
+						}
 
-										break;
-									case AND:
-									if(0x0020 & cpu->ir){ //0000|0000|0010|0000
-											cpu->A = cpu->r[Rs1];
-											cpu->B = (immed_offset & 0x001f);
-										} else{
-											cpu->A = cpu->r[Rs1];
-											cpu->B = cpu->r[Rs2];
-										}
-										break;
-									case NOT:
-										cpu->A = cpu->r[Rs1];
-										break;
-									case ST:
-										cpu->MDR = cpu->r[Rd];
-                    // get operands out of registers into A, B of ALU
-                    // or get memory for load instr.
-										break;
+						break;
+					case AND:
+					if(0x0020 & cpu->ir){ //0000|0000|0010|0000
+							cpu->A = cpu->r[Rs1];
+							cpu->B = (immed_offset & 0x001f);
+						} else{
+							cpu->A = cpu->r[Rs1];
+							cpu->B = cpu->r[Rs2];
+						}
+						break;
+					case NOT:
+						cpu->A = cpu->r[Rs1];
+						break;
+					case ST:
+						cpu->MDR = cpu->r[Rd];
+	// get operands out of registers into A, B of ALU
+	// or get memory for load instr.
+						break;
+					case TRAP:
+						cpu->MDR = memory[cpu->MAR];
+						cpu->r[7] = cpu->PC;
                 }
                 state = EXECUTE;
                 //break;
@@ -241,115 +336,113 @@ int controller (CPU_p cpu) {
                 switch (opcode) {
                     // do what the opcode is for, e.g. ADD
                     // in case of TRAP: call trap(int trap_vector) routine, see below for TRAP x25 (HALT)
-										case ADD:
-											//printf("cpu->a is %X", (cpu->A));
-											//printf("cpu->b is %X", (cpu->B));
-											// checks for negative addition
-											if (cpu->A & 0x10) {
-												cpu->Res = -(cpu->A) + (cpu->B);
-											} else if (cpu->B & 0x10) {
-												cpu->Res = (cpu->A) + -(cpu->B);
-											} else if ((cpu->A & 0x10) & (cpu->B & 0x10)) {
-												cpu->Res = -(cpu->A) + -(cpu->B);
-											} else {
-												cpu->Res = (cpu->A) + (cpu->B);
-											}
-											cpu->N = 0;
-											cpu->Z = 0;
-											cpu->P = 0;
-											//int g = sizeof(cpu->Res);
-											cc = (short int) cpu->Res;
-											//printf(" Check if cc is negative when it needs to be    %d", cc);
-											if (cc < 0x0000){
-												cpu->N = 1;
-											}
-											if (cc == 0x0000){
-												cpu->Z = 1;
-											}
-											if (cc > 0x0000){
-												cpu->P = 1;
-											}
-											break;
-										case AND:
-											cpu->Res = cpu->A & cpu->B;
-											cpu->N = 0;
-											cpu->Z = 0;
-											cpu->P = 0;
-											cc = cpu->Res;
-											if (cc < 0x0000){
-												cpu->N = 1;
-											}
-											if (cc == 0x0000){
-												cpu->Z = 1;
-											}
-											if (cc > 0x0000){
-												cpu->P = 1;
-											}
-
-											break;
-										case NOT:
-											cpu->Res = ~(cpu->A);
-											cpu->N = 0;
-											cpu->Z = 0;
-											cpu->P = 0;
-											cc = (short) cpu->Res;
-											if (cc < 0x0000){
-												cpu->N = 1;
-											}
-											if (cc == 0x0000){
-												cpu->Z = 1;
-											}
-											if (cc > 0x0000){
-												cpu->P = 1;
-											}
-											break;
-										case TRAP:
-											trap((int) (immed_offset & 0x00ff));
-											exit(0);
-											break;
-
-										case JMP:
-											cpu->PC = cpu->r[Rs1];
-											break;
-										case BR:
-												if (cpu->N && (Rd & 4)) {
-													cpu->PC = cpu->PC + sext9(immed_offset);
-													break;
-												}
-												if (cpu->Z && (Rd & 2)) {
-													cpu->PC = cpu->PC + sext9(immed_offset);
-													break;
-												}
-												if (cpu->P && (Rd & 1)) {
-													cpu->PC = cpu->PC + sext9(immed_offset);
-													break;
-												}
-											break;
+					case ADD:
+						//printf("cpu->a is %X", (cpu->A));
+						//printf("cpu->b is %X", (cpu->B));
+						// checks for negative addition
+						if (cpu->A & 0x10) {
+							cpu->Res = -(cpu->A) + (cpu->B);
+						} else if (cpu->B & 0x10) {
+							cpu->Res = (cpu->A) + -(cpu->B);
+						} else if ((cpu->A & 0x10) & (cpu->B & 0x10)) {
+							cpu->Res = -(cpu->A) + -(cpu->B);
+						} else {
+							cpu->Res = (cpu->A) + (cpu->B);
+						}
+						//setFlags(cpu, 0, 0, 0);
+						//int g = sizeof(cpu->Res);
+						cc = (short int) cpu->Res;
+						//printf(" Check if cc is negative when it needs to be    %d", cc);
+						printf ("\n\nabove\n\n");
+						chooseFlag (cpu, cc);
+						printf ("\n\nbelow\n\n");
+						break;
+					case AND:
+						cpu->Res = cpu->A & cpu->B;
+						cpu->N = 0;
+						cpu->Z = 0;
+						cpu->P = 0;
+						cc = cpu->Res;
+						chooseFlag (cpu, cc);
+						break;
+					case NOT:
+						cpu->Res = ~(cpu->A);
+						cpu->N = 0;
+						cpu->Z = 0;
+						cpu->P = 0;
+						cc = (short) cpu->Res;
+						chooseFlag (cpu, cc);
+						break;
+					case TRAP:
+						cpu->PC = cpu->MDR;
+						value = trap(cpu, cpu->MAR);
+						cpu->PC = cpu->r[7];
+						
+						if (value == 1) {
+							return 0;
+						} else if (value > 1) {
+							charToPrint = (char) value;
+							cpu->out = charToPrint;
+							cpu->r[Rd] = value;
+						}
+						//trap((int) (immed_offset & 0x00ff));
+						break;
+					case JSRR:
+						cpu->r[7] = cpu->PC;
+						cpu->PC = cpu->r[BaseR];
+						break;
+					case JMP:
+						cpu->r[7] = cpu->PC;
+						cpu->PC = cpu->r[Rs1];
+						break;
+					case BR:
+						if (cpu->N && (Rd & 4)) {
+							cpu->PC = cpu->PC + sext9(immed_offset);
+							break;
+						}
+						if (cpu->Z && (Rd & 2)) {
+							cpu->PC = cpu->PC + sext9(immed_offset);
+							break;
+						}
+						if (cpu->P && (Rd & 1)) {
+							cpu->PC = cpu->PC + sext9(immed_offset);
+							break;
+						}
+					break;
                 }
                 state = STORE;
                 //break;
             case STORE: // Look at ST. Microstate 16 is the store to memory
                 switch (opcode) {
-									case ADD:
-										cpu->r[Rd] = cpu->Res;
+					case ADD:
+						cpu->r[Rd] = cpu->Res;
 
-										break;
-									case AND:
-										cpu->r[Rd] = cpu->Res;
-										break;
-									case NOT:
-										cpu->r[Rd] = cpu->Res;
-										break;
-									// case TRAP:
-									case LD:
-										cpu->r[Rd] = cpu->MDR;
-										break;
-									case ST:
-										memory[cpu->MAR] = cpu->MDR;
-									// case JMP:
-									// case BR:
+						break;
+					case AND:
+						cpu->r[Rd] = cpu->Res;
+						break;
+					case NOT:
+						cpu->r[Rd] = cpu->Res;
+						break;
+					// case TRAP:
+					case LDR:
+					case LD:
+						cpu->r[Rd] = cpu->MDR;
+						printf("cpu->r[%d]: %4X\n\n", Rd, cpu->r[Rd]);
+						cc = cpu->r[Rd];
+						chooseFlag (cpu, cc);
+						break;
+					case LEA:
+						cpu->r[Rd] = cpu->PC + sext9(immed_offset);
+						cc = cpu->r[Rd];
+						chooseFlag (cpu, cc);
+						break;
+					case ST:
+						memory[cpu->MAR] = cpu->MDR;
+					// case JMP:
+					// case BR:
 
-										break;
+						break;
                     // write back to register or store MDR into memory
                 }
                 // do any clean up here in prep for the next complete cycle
@@ -375,14 +468,14 @@ int main(int argc, char* argv[]){
 	memShift = 0;
 	//char *temp;
 	CPU_p cpu = malloc(sizeof(CPU_s));
-	    cpu->r[0] = 0x4100;
-	    cpu->r[1] = 0x0001;
-	    cpu->r[2] = 0x0001;
-	    cpu->r[3] = 0x102A;
-	    cpu->r[4] = 0x94CD;
-	    cpu->r[5] = 0x0002;
-	    cpu->r[6] = 0x9001;
-	    cpu->r[7] = 0x3100;
+	    cpu->r[0] = 0x0000;
+	    cpu->r[1] = 0x0000;
+	    cpu->r[2] = 0x0000;
+	    cpu->r[3] = 0x0000;
+	    cpu->r[4] = 0x0000;
+	    cpu->r[5] = 0x0000;
+	    cpu->r[6] = 0x0000;
+	    cpu->r[7] = 0x0000;
 	    cpu->ir = 0x0000;
 	    cpu->PC = 0x3000;
 	    cpu->MAR = 0x0000;
@@ -392,7 +485,8 @@ int main(int argc, char* argv[]){
 	    cpu->N = 0;
 	    cpu->Z = 0;
 	    cpu->P = 0;
-
+		
+		
 	    displayScreen(cpu, memShift);
 	    dialog(cpu);
 //	for(i = 1; i < argc; i++){
