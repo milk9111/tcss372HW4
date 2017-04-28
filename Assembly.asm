@@ -83,7 +83,7 @@ JSRR R7
 			PUTS			 ; Printing Encrypted Name
 
 		HALT
-KEY		.FILL #0
+KEY		.FILL #-3
 NEGENTER	.FILL xFFF6	
 PROMPT		.STRINGZ "Please enter your name: "
 HELLO 		.STRINGZ "Press any key to continue\n"
