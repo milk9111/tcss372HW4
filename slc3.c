@@ -46,14 +46,13 @@ int trap(CPU_p cpu, int trap_vector) {
 			printf("");
 			break;
 		case PUTS:
-			//temp = cpu->out;
-			displayScreen(cpu, 0);
-			//for (int i = 0; i < 20; i++, temp++) {
-			//	printf ("%4X\n", *temp);
-			//}
-			//while (*temp) {printf("%c", *temp); temp++;}
-			printf("%s", cpu->out);
-			exit(0);
+        int i;
+        i = 0;
+        while ((temp)) {
+          temp = memory[(cpu->r[0] - 0x2FFF + i)];
+          printf("%c", (temp));
+          i++;
+        }
 			break;
 		case HALT:
 			value = 1;
@@ -308,10 +307,7 @@ int controller (CPU_p cpu, int isRunning) {
                 switch (opcode) {
 					case LDR:
 					case LD:
-					//	printf("MAR: %d\n", cpu->MAR);
-					//	printf("mem[%d]: %4X\n", cpu->MAR, memory[cpu->MAR]);
-					  cpu->MDR = memory[cpu->MAR];
-					  //printf ("cpu->MDR: %4X\n\n", cpu->MDR);
+					 cpu->MDR = memory[cpu->MAR];
 						break;
 					case ADD:
 						if(0x0020 & cpu->ir){ //0000|0000|0010|0000
@@ -397,19 +393,7 @@ int controller (CPU_p cpu, int isRunning) {
 					case TRAP:
 						switch (cpu->MAR) {
 							case PUTS:
-								//unsigned short temp = memory[(cpu->r[0] - 0x2FFF)];
-								//while (memory[temp] != 0) temp++;
-								//printf("%d\n", cpu->r[0] - 0x3000);
-								//exit(0);
-								for(int i = 46; i < 70; i++) {
-									printf ("%c\n", (char) memory[i]);
-								}
-								//printf ("%d\n", cpu->r[0] - 0x2FFF);
-								cpu->out = (char *) memory[(cpu->r[0] - 0x2FFF)];
-								printf ("%p\n", ((char *) memory) + (cpu->r[0] - 0x2FFF));
-								printf("%p\n", cpu->out);
-								//printf("%c\n", *(cpu->out));
-								
+                cpu->out = memory[(cpu->r[0] - 0x2FFF)];
 								break;
 						}
 						cpu->PC = cpu->MDR;
@@ -492,22 +476,13 @@ int controller (CPU_p cpu, int isRunning) {
 			dialog(cpu);
 		}
     }
-//		int i = 0;
-//		for(i = 0; i < 8;i++){
-//			printf("R%d = %u\n",i, cpu->r[i]);
-//		}
-//		printf("MAR = %u\nIR = %u\nPC = %u\n",cpu->MAR, cpu->ir, cpu->PC);
 }
 
 int main(int argc, char* argv[]){
 
-//	char *temp;
-//	int i;
 	setvbuf(stdout, NULL, _IONBF, 0);
 	isLoaded = 0;
 	memShift = 0;
-	//char *temp;
-	char *temp = "abcde";
 	CPU_p cpu = malloc(sizeof(CPU_s));
 	    cpu->r[0] = 0x0000;
 	    cpu->r[1] = 0x0000;
@@ -530,15 +505,5 @@ int main(int argc, char* argv[]){
 		
 	    displayScreen(cpu, memShift);
 	    dialog(cpu);
-//	for(i = 1; i < argc; i++){
-//	 	CPU_p c = malloc(sizeof(CPU_s));
-//		memory[0] = strtol(argv[i], &temp, 16);
-//		memory[4] = 0xA0A0;
-//		controller(c);
-//	}
-	//  for(i = 1; i < argc; i++){
-	//  	memory[i-1] = strtol(argv[i], &temp, 16);
-	// }
-	//  controller(c);
 	return 0;
 }
