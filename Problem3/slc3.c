@@ -147,15 +147,15 @@ int dialog(CPU_p cpu) {
 					scanf("%s", &fileName);
 					inputFile = fopen(fileName, "r");
 					if (inputFile == NULL) {
-						printf("DIDNT OPEN");
+						printf("DIDN'T OPEN");
 						break;
 					}
-					for(int i = 0; i < 31; i++) {
-						fscanf(inputFile, "%04X", &memory[i]);
+					int i = 0;
+					while (fscanf(inputFile, "%04X", &memory[i]) != EOF) {
 						if (i == 0) {
 							cpu->PC = memory[0];
 						}
-
+						i++;
 					}
 					isLoaded = 1;
 					displayScreen(cpu, 0);
@@ -170,7 +170,7 @@ int dialog(CPU_p cpu) {
 					}
 					break;
 				case 5:
-					printf("How much would you like to shift?:");
+					printf("Position to move to? (in decimal): ");
 
 					scanf("%d", &memShift);
 					if(memShift > MAX_MEMORY - 17) {
@@ -179,9 +179,9 @@ int dialog(CPU_p cpu) {
 						break;
 					} else {
 						displayScreen(cpu, memShift);
-						for (int i = 0; i < MAX_MEMORY; i++) {
+						/*for (int i = 0; i < MAX_MEMORY; i++) {
 							printf("i: %d    %4X\n", i, memory[i]);
-						}
+						}*/
 					}
 					//printf("About to send to displayScreen()\n");
 
@@ -264,15 +264,15 @@ int controller (CPU_p cpu) {
             case EVAL_ADDR: // Look at the LD instruction to see microstate 2 example
                 switch (opcode) {
 					case LDR:
-						printf ("BaseR: %d\n", BaseR);
+						/*printf ("BaseR: %d\n", BaseR);
 						printf ("sext: %4X\n", sext6(immed_offset));
 						printf ("r[%d]: %4X\n", BaseR, cpu->r[BaseR]);
 						printf ("%4X + %4X = %4X\n", cpu->r[BaseR], sext6(immed_offset), cpu->r[BaseR] + sext6(immed_offset));
 						printf ("%4X - %4X = %4X\n", cpu->r[BaseR] + sext6(immed_offset), 0x3008, (cpu->r[BaseR] + sext6(immed_offset)) - 0x3008);
-
-						cpu->MAR = (cpu->r[BaseR] + sext6(immed_offset)) - 0x3008;
-						printf ("cpu->MAR: 0x%4X\n\n", cpu->MAR);
-						printf ("cpu->MAR: %d\n\n", cpu->MAR);
+						*/
+						cpu->MAR = (cpu->r[BaseR] + sext6(immed_offset)) - 0x2FFF;
+						//printf ("cpu->MAR: 0x%4X\n\n", cpu->MAR);
+						//printf ("cpu->MAR: %d\n\n", cpu->MAR);
 						break;
 					case LD:
 						cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
@@ -295,12 +295,13 @@ int controller (CPU_p cpu) {
                 switch (opcode) {
 					case LDR:
 					case LD:
-					//	printf("MAR: %d", cpu->MAR);
+					//	printf("MAR: %d\n", cpu->MAR);
+					//	printf("mem[%d]: %4X\n", cpu->MAR, memory[cpu->MAR]);
 					  cpu->MDR = memory[cpu->MAR];
-					  printf ("cpu->MDR: %4X\n\n", cpu->MDR);
+					  //printf ("cpu->MDR: %4X\n\n", cpu->MDR);
 						break;
 					case ADD:
-						if(0x0020 & cpu->ir){ //0000|0000|0010|0000
+						if(0x0040 & cpu->ir){ //0000|0000|0100|0000
 							cpu->A = cpu->r[Rs1];
 							cpu->B = (immed_offset & 0x001f);
 						} else{
