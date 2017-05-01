@@ -53,7 +53,7 @@
 #define END 0xF025
 
 #define SEXT5_SIGN_EXTEND 0xFFF0
-#define SEXT9_SIGN_EXTEND 0xFD00
+#define SEXT9_SIGN_EXTEND 0xFE00
 
 #define N_CHECK 0x0800
 #define Z_CHECK 0x0400

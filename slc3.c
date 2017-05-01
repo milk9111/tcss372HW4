@@ -226,10 +226,11 @@ int controller (CPU_p cpu, ALU_p alu, int isRunning) {
                 case BR: 
                   if (BEN) {
 					  printf("\n\n IN BRANCH execute\n\n");
-					  printf("\nPC: %4X ", cpu->pc);
-					  printf("    SEXT(OFFSET9): %4X\n", sext9(offset9));
-					  printf("%4X + %4X = %4X\n\n", cpu->pc, sext9(offset9), cpu->pc + sext9(offset9));
-                    cpu->pc = cpu->pc + sext9(offset9);
+					  printf("\nPC: %4X ", ((cpu->pc - 1) + 0x3000));
+					  printf("    SEXT(OFFSET9): %4X\n", sext9(cpu->ir & OFFSET9_FIELD));
+					  printf("%4X + %4X = %4X\n\n", ((cpu->pc - 1) + 0x3000), sext9(cpu->ir & OFFSET9_FIELD), ((cpu->pc - 1) + 0x3000) + sext9(cpu->ir & OFFSET9_FIELD));
+                    cpu->pc = (((cpu->pc - 1) + 0x3000) + sext9(cpu->ir & OFFSET9_FIELD)) - 0x3000;
+					printf ("\nPC: %4X\n", cpu->pc);
                   } else {
 					printf ("\n\nBEN not enabled\n\n");
 				  }
