@@ -1,54 +1,41 @@
 /*
-	Author: Connor Lundberg, Daniel Ivanov
-	Date: 4/26/2017
-	
-	The first version of our LC3 personal simulation. It takes a single command
-	and runs it through the controller, terminating with a HALT trap. We do this
-	to end the loop and also to cut out the HALT trap test.
-*/
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h> 
-#include <termios.h> 
+ * Authors: Connor Lundberg, Daniel Ivanov
+ * Date: 4/28/2017
+ */
 #include "slc3.h"
 
-//current version
+int controller (CPU_p);
+
+int displayScreen (CPU_p, int);
+
+int dialog (CPU_p cpu);
+
+char getch ();
+
+void setFlags (CPU_p, unsigned int, unsigned int, unsigned int);
 
 
 // you can define a simple memory module here for this program
-unsigned int memory[MAX_MEMORY];   // 500 words of memory enough to store simple program
+unsigned short memory[MAX_MEMORY];   // 500 words of memory enough to store simple program
+int isLoaded;
+int memShift;
 
 
-void initializeCPU(CPU_p *, ALU_p *);
-void display(CPU_p *, ALU_p *, int, int);
-void setFlags(CPU_p *, ALU_p *, Register, Register);
-
-
-
- 
-char getch() {
-	char buf = 0;         
-	struct termios old = {0};         
-	if (tcgetattr(0, &old) < 0)                 
-		perror("tcsetattr()");         
-	old.c_lflag &= ~ICANON;         
-	old.c_lflag &= ~ECHO;         
-	old.c_cc[VMIN] = 1;         
-	old.c_cc[VTIME] = 0;         
-	if (tcsetattr(0, TCSANOW, &old) < 0)                 
-		perror("tcsetattr ICANON");        
-	if (read(0, &buf, 1) < 0)                 
-		perror ("read()");         
-	old.c_lflag |= ICANON;         
-	old.c_lflag |= ECHO;         
-	if (tcsetattr(0, TCSADRAIN, &old) < 0)                 
-		perror ("tcsetattr ~ICANON");         
-	return (buf); 
+int sext6(int offset6) {
+	if (HIGH_ORDER_BIT_VALUE6 & offset6) return (offset6 | SEXT6_SIGN_EXTEND);
+	else return offset6 & 0x003F;
 }
+
+
+int sext9(int offset9) {
+	if (HIGH_ORDER_BIT_VALUE9 & offset9) return (offset9 | SEXT9_SIGN_EXTEND);
+	else return offset9;
+}
+
 
 // This is the trap function that handles trap vectors. Acts as 
 // the trap vector table for now. Currently exits the HALT trap command.
-int trap(CPU_p cpu, ALU_p alu, int trap_vector) {
+int trap(CPU_p cpu, int trap_vector) {
 	int value = 0;
 	switch (trap_vector) {
 		case GETC:
@@ -69,366 +56,450 @@ int trap(CPU_p cpu, ALU_p alu, int trap_vector) {
 }
 
 
-// This is the sext for the immed5. 
-int sext5(int immed5) {
-	if (HIGH_ORDER_BIT_VALUE & immed5) return (immed5 | SEXT5_SIGN_EXTEND);
-	else return immed5;
+void chooseFlag (CPU_p cpu, int cc) {
+	printf ("\n\n IN chooseFlag \n\n");
+	if (cc < 0x0000){
+		setFlags(cpu, 1, 0, 0);
+	}
+	if (cc == 0x0000){
+		setFlags(cpu, 0, 1, 0);
+	}
+	if (cc > 0x0000){
+		setFlags(cpu, 0, 0, 1);
+	}
+}
+	
+
+void setFlags (CPU_p cpu, unsigned int neg, unsigned int zero, unsigned int pos) {
+	printf ("\n\n IN setFlags \n\n");
+	cpu->N = neg;
+	cpu->Z = zero;
+	cpu->P = pos;
 }
 
 
-// This is the sext for the PCOffset9.
-int sext9(int offset9) {
-	if (HIGH_ORDER_BIT_VALUE9 & offset9) return (offset9 | SEXT9_SIGN_EXTEND);
-	else return offset9;
+char getch() {
+	char buf = 0;         
+	struct termios old = {0};         
+	if (tcgetattr(0, &old) < 0)                 
+		perror("tcsetattr()");         
+	old.c_lflag &= ~ICANON;         
+	old.c_lflag &= ~ECHO;         
+	old.c_cc[VMIN] = 1;         
+	old.c_cc[VTIME] = 0;         
+	if (tcsetattr(0, TCSANOW, &old) < 0)                 
+		perror("tcsetattr ICANON");        
+	if (read(0, &buf, 1) < 0)                 
+		perror ("read()");         
+	old.c_lflag |= ICANON;         
+	old.c_lflag |= ECHO;         
+	if (tcsetattr(0, TCSADRAIN, &old) < 0)                 
+		perror ("tcsetattr ~ICANON");         
+	return (buf); 
 }
 
 
-// This is the main controller for our CPU. It is complete with all microstates
-// defined for this project.
-int controller (CPU_p cpu, ALU_p alu, int isRunning) {
-	Register opcode, Rd, Rs1, Rs2, immed5, offset9;	// fields for the IR
-	Register effective_addr, trapVector8, BaseR;
-	char *nextLine = malloc (sizeof(char));
+int displayScreen(CPU_p cpu, int mem) {
+	printf("\t\tWelcome to the LC-3 Simulator Simulator\n\n");
+	printf("\t\tRegisters \t\t    Memory\n");
+//	for (int i = 0x0000; i < 8; i++) {
+//		if (i == 0) {
+//			printf("\t\tR%d: x%04X \t\t x300%d: x%04X\n", i, cpu->r[i], i+mem, memory[i+1]);
+//		} else {
+//			printf("\t\tR%d: x%04X \t\t x300%d: x%04X\n", i, cpu->r[i], i+mem, memory[i+1]);
+//		}
+//	}
+	int i = 0x3000 + mem;
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 0, cpu->r[0], i, memory[1 + mem]);
+
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 1, cpu->r[1], i+1, memory[2 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 2, cpu->r[2], i+2, memory[3 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 3, cpu->r[3], i+3, memory[4 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 4, cpu->r[4], i+4, memory[5 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 5, cpu->r[5], i+5, memory[6 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 6, cpu->r[6], i+6, memory[7 + mem]);
+	printf("\t\tR%d: x%04X \t\t x%X: x%04X\n", 7, cpu->r[7], i+7, memory[8 + mem]);
+
+	i = 0x3008 + mem; // replace i with the mem dump number if you want.
+	printf("\t\t\t\t\t x%X: x%04X\n",i, memory[9 + mem]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i+1, memory[10 + mem]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i+2, memory[11 + mem]);
+	printf("\t\tPC:x%0.4X    IR:x%04X     x%X: x%04X\n",cpu->PC,cpu->ir,i+3, memory[12 + mem]);
+	printf("\t\tA: x%04X    B: x%04X     x%X: x%04X\n",cpu->A,cpu->B,i+4, memory[13 + mem]);
+	printf("\t\tMAR:x%04X  MDR:x%04X     x%X: x%04X\n",cpu->MAR + 0x2FFF,cpu->MDR,i+5, memory[14 + mem]);
+	printf("\t\tCC: N: %d  Z: %01d P: %d      x%X: x%04X\n",cpu->N,cpu->Z,cpu->P,i+6, memory[15 + mem]);
+	printf("\t\t\t\t\t x%X: x%04X\n",i+7, memory[16 + mem]);
+	printf("  Select: 1)Load, 3)Step, 5)Display Mem, 9)Exit\n");
+	return 0;
+}
+
+
+int dialog(CPU_p cpu) {
+	//int isTrue = 0;
+	int opNum = 0;
+	char fileName[100];
+	FILE* inputFile;
+		while (opNum != 9) {
+			scanf("%d", &opNum);
+			switch (opNum) {
+				case 1:
+					printf("File Name: ");
+					scanf("%s", &fileName);
+					inputFile = fopen(fileName, "r");
+					if (inputFile == NULL) {
+						printf("DIDN'T OPEN");
+						break;
+					}
+					int i = 0;
+					while (fscanf(inputFile, "%04X", &memory[i]) != EOF) {
+						if (i == 0) {
+							cpu->PC = memory[0];
+						}
+						i++;
+					}
+					isLoaded = 1;
+					displayScreen(cpu, 0);
+					fclose(inputFile);
+					break;
+				case 3:
+					if (isLoaded == 1) {
+						controller(cpu);
+						opNum = 0;
+					} else {
+						printf("No file loaded!");
+					}
+					break;
+				case 5:
+					printf("Position to move to? (in decimal): ");
+
+					scanf("%d", &memShift);
+					if(memShift > MAX_MEMORY - 17) {
+						printf("Error: out of memory");
+						memShift = 0;
+						break;
+					} else {
+						displayScreen(cpu, memShift);
+						/*for (int i = 0; i < MAX_MEMORY; i++) {
+							printf("i: %d    %4X\n", i, memory[i]);
+						}*/
+					}
+					//printf("About to send to displayScreen()\n");
+
+					//dialog(cpu);
+					break;
+				case 9:
+					printf("Simulation Terminated.");
+					break;
+			}
+		}
+}
+
+
+
+
+int controller (CPU_p cpu) {
+    // check to make sure both pointers are not NULL
+    // do any initializations here
+		unsigned int state;
+		short cc;
+	unsigned int opcode, Rd, Rs1, Rs2, immed_offset, BaseR;	// fields for the IR
 	char charToPrint = ' ';
-	int value = 0, start = 1;
-	
-    initializeCPU(&cpu, &alu);
-		   
-	if (!isRunning) {
-		cpu->ir = memory[cpu->pc];
-		cpu->pc++;
-		display(&cpu, &alu, 0, 0);
-		scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
-								//Probably a better way to do this.
-	}
-    int state = FETCH, BEN = 0;
-    for (;;) {
+	int value = 0;
+    state = FETCH;
+		int j;
+		//for(;;){
+    for (j = 0;j < 6;j++) {
         switch (state) {
-            case FETCH:
-				if (!start) {
-					//printf ("\n\nIR BEFORE: %X\n\n", cpu->ir);
-					cpu->mar = cpu->pc;
-					cpu->pc++;
-					cpu->mdr = memory[cpu->mar];
-					cpu->ir = cpu->mdr;
-					//printf ("\n\nIR AFTER: %X\n\n", cpu->ir);
-					if (!isRunning) {
-						scanf("%c", nextLine);	//This is for the user to press enter to go to next step.
-												//Probably a better way to do this.
-						display(&cpu, &alu, 0, 0);
-						
-					}
-				  
-				}
-              state = DECODE;
-              break;
+            case FETCH: // microstates 18, 33, 35 in the book
+                //printf("Here in FETCH\n");
+                // get memory[PC] into IR - memory is a global array
+            	 cpu->MAR = (cpu->PC - 0x2FFF);
+            	 cpu->PC++;	// increment PC
+
+            	                //microstate 33
+            	 cpu->MDR = memory[cpu->MAR];
+
+            	                //microstate 35
+            	 cpu->ir = cpu->MDR;
+            	 cc = 0;
+                // increment PC
+                //printf("Contents of IR = %04X\n", cpu->ir);
+				//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+                // put printf statements in each state and microstate to see that it is working
+ 				//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+               state = DECODE;
+          	 //printf("IM HERE ");
+
+                //break;
             case DECODE:
-              opcode = (cpu->ir & OPCODE_FIELD) >> OPCODE_FIELD_SHIFT;
-              switch (opcode) {
-                case ADD:
-                case AND:
-                  Rd = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
-                  Rs1 = (cpu->ir & RS1_FIELD) >> RS1_FIELD_SHIFT;
-                  if (!(HIGH_ORDER_BIT_VALUE & cpu->ir)){	
-                    Rs2 = (cpu->ir & RS2_FIELD) >> RS2_FIELD_SHIFT;
-                  } else {
-                    immed5 = (cpu->ir & IMMED5_FIELD) >> IMMED5_FIELD_SHIFT;
-                    immed5 = sext5(IMMED5_FIELD & cpu->ir);
-                  }
-                  break;
-                case NOT:
-                  Rd = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
-                  Rs1 = (cpu->ir & RS1_FIELD) >> RS1_FIELD_SHIFT;
-                  break;
-                case TRAP:
-                  trapVector8 = (cpu->ir & TRAP_VECTOR8_FIELD) >> TRAP_VECTOR8_FIELD_SHIFT;
-                  break;
-				case LEA:
-                case LD:
-                  Rd = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
-                  offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
-                  break;
-                case ST:
-                  Rs1 = (cpu->ir & RD_FIELD) >> RD_FIELD_SHIFT;
-                  offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
-                  break;
-				case JSRR:
-                case JMP:
-                  BaseR = (cpu->ir & RS1_FIELD) >> RS1_FIELD_SHIFT;
-                  break;
-                case BR:
-                  offset9 = (cpu->ir & OFFSET9_FIELD) >> OFFSET9_FIELD_SHIFT;
-				  printf("\n\n IN BRANCH decode\n\n");
-                  break;
-              }
-              BEN = ((cpu->ir & N_CHECK) && cpu->n) || ((cpu->ir & Z_CHECK) && cpu->z) || ((cpu->ir & P_CHECK) && cpu->p);  
-              state = EVAL_ADDR;
-              break;
-            case EVAL_ADDR:
-              switch (opcode) {
-                case LD:
-                case ST:
-                  cpu->mar = cpu->pc + sext9(OFFSET9_FIELD & cpu->ir);
-                  break;
-                case TRAP:
-                  cpu->mar = TRAP_VECTOR8_FIELD & cpu->ir;
+						// microstate 32
+                // get the fields out of the IR
+            	//printf("IM HERE");
+				opcode = cpu->ir >> 12;
+
+				//0x0fff
+				Rd = cpu->ir & 0x0fff;
+				Rd = (short)Rd >> 9;
+
+				//0x01ff
+				Rs1 = cpu->ir & 0x01ff;
+				Rs1 = (short)Rs1 >> 5;
+
+				//0x0007
+				Rs2 = cpu->ir & 0x0007;
+
+				//0x01ff
+				immed_offset = cpu->ir & 0x01ff;
+				
+				printf ("\n\n IR: %4X\n\n", cpu->ir);
+				BaseR = (cpu->ir & 0x01C0) >> 6;
+
+                // make sure opcode is in integer form
+				// hint: use four unsigned int variables, opcode, Rd, Rs, and immed7
+				// extract the bit fields from the IR into these variables
+                state = EVAL_ADDR;
+                //break;
+            case EVAL_ADDR: // Look at the LD instruction to see microstate 2 example
+                switch (opcode) {
+					case LDR:
+						/*printf ("BaseR: %d\n", BaseR);
+						printf ("sext: %4X\n", sext6(immed_offset));
+						printf ("r[%d]: %4X\n", BaseR, cpu->r[BaseR]);
+						printf ("%4X + %4X = %4X\n", cpu->r[BaseR], sext6(immed_offset), cpu->r[BaseR] + sext6(immed_offset));
+						printf ("%4X - %4X = %4X\n", cpu->r[BaseR] + sext6(immed_offset), 0x3008, (cpu->r[BaseR] + sext6(immed_offset)) - 0x3008);
+						*/
+						cpu->MAR = (cpu->r[BaseR] + sext6(immed_offset)) - 0x2FFF;
+						//printf ("cpu->MAR: 0x%4X\n\n", cpu->MAR);
+						//printf ("cpu->MAR: %d\n\n", cpu->MAR);
+						break;
+					case LD:
+						cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
+						//printf("PC: %d, IMM: %d", (cpu->PC - 0x2FF), immed_offset);
+						//cpu->r[Rd] = memory[cpu->PC + immed-offset]
+						break;
+					case ST:
+						cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
+						//memory[cpu->PC + immed-offset] = Rd
+						break;
+					case TRAP:
+						cpu->MAR = immed_offset & 0x00ff;
+						break;
+                // different opcodes require different handling
+                // compute effective address, e.g. add sext(immed7) to register
+                }
+                state = FETCH_OP;
+                //break;
+            case FETCH_OP: // Look at ST. Microstate 23 example of getting a value out of a register
+                switch (opcode) {
+					case LDR:
+					case LD:
+					//	printf("MAR: %d\n", cpu->MAR);
+					//	printf("mem[%d]: %4X\n", cpu->MAR, memory[cpu->MAR]);
+					  cpu->MDR = memory[cpu->MAR];
+					  //printf ("cpu->MDR: %4X\n\n", cpu->MDR);
+						break;
+					case ADD:
+						if(0x0020 & cpu->ir){ //0000|0000|0010|0000
+							cpu->A = cpu->r[Rs1];
+							cpu->B = (immed_offset & 0x001f);
+						} else{
+							cpu->A = cpu->r[Rs1];
+							cpu->B = cpu->r[Rs2];
+						}
+
+						break;
+					case AND:
+					if(0x0020 & cpu->ir){ //0000|0000|0010|0000
+							cpu->A = cpu->r[Rs1];
+							cpu->B = (immed_offset & 0x001f);
+						} else{
+							cpu->A = cpu->r[Rs1];
+							cpu->B = cpu->r[Rs2];
+						}
+						break;
+					case NOT:
+						cpu->A = cpu->r[Rs1];
+						break;
+					case ST:
+						cpu->MDR = cpu->r[Rd];
+	// get operands out of registers into A, B of ALU
+	// or get memory for load instr.
+						break;
+					case TRAP:
+						cpu->MDR = memory[cpu->MAR];
+						cpu->r[7] = cpu->PC;
+                }
+                state = EXECUTE;
+                //break;
+            case EXECUTE: // Note that ST does not have an execute microstate
+                switch (opcode) {
+                    // do what the opcode is for, e.g. ADD
+                    // in case of TRAP: call trap(int trap_vector) routine, see below for TRAP x25 (HALT)
+					case ADD:
+						//printf("cpu->a is %X", (cpu->A));
+						//printf("cpu->b is %X", (cpu->B));
+						// checks for negative addition
+						if (cpu->A < 0) {
+							cpu->Res = -(cpu->A) + (cpu->B);
+               
+						} else if (cpu->B < 0) {
+							cpu->Res = (cpu->A) -(cpu->B);
+						} else if ((cpu->A < 0) & (cpu->B < 0)) {
+							cpu->Res = -(cpu->A) -(cpu->B);
+						} else {
+							cpu->Res = (cpu->A) + (cpu->B);
+						}
+						//setFlags(cpu, 0, 0, 0);
+						//int g = sizeof(cpu->Res);
+						cc = (short int) cpu->Res;
+						//printf(" Check if cc is negative when it needs to be    %d", cc);
+						printf ("\n\nabove\n\n");
+						chooseFlag (cpu, cc);
+						printf ("\n\nbelow\n\n");
+						break;
+					case AND:
+						cpu->Res = cpu->A & cpu->B;
+						cpu->N = 0;
+						cpu->Z = 0;
+						cpu->P = 0;
+						cc = cpu->Res;
+						chooseFlag (cpu, cc);
+						break;
+					case NOT:
+						cpu->Res = ~(cpu->A);
+						cpu->N = 0;
+						cpu->Z = 0;
+						cpu->P = 0;
+						cc = (short) cpu->Res;
+						chooseFlag (cpu, cc);
+						break;
+					case TRAP:
+						cpu->PC = cpu->MDR;
+						value = trap(cpu, cpu->MAR);
+						cpu->PC = cpu->r[7];
+						
+						if (value == 1) {
+							return 0;
+						} else if (value > 1) {
+							charToPrint = (char) value;
+							cpu->out = charToPrint;
+							cpu->r[Rd] = value;
+						}
+						//trap((int) (immed_offset & 0x00ff));
+						break;
+					case JSRR:
+						cpu->r[7] = cpu->PC;
+						cpu->PC = cpu->r[BaseR];
+						break;
+					case JMP:
+						cpu->r[7] = cpu->PC;
+						cpu->PC = cpu->r[Rs1];
+						break;
+					case BR:
+						if (cpu->N && (Rd & 4)) {
+							cpu->PC = cpu->PC + sext9(immed_offset);
+							break;
+						}
+						if (cpu->Z && (Rd & 2)) {
+							cpu->PC = cpu->PC + sext9(immed_offset);
+							break;
+						}
+						if (cpu->P && (Rd & 1)) {
+							cpu->PC = cpu->PC + sext9(immed_offset);
+							break;
+						}
+					break;
+                }
+                state = STORE;
+                //break;
+            case STORE: // Look at ST. Microstate 16 is the store to memory
+                switch (opcode) {
+					case ADD:
+						cpu->r[Rd] = cpu->Res;
+
+						break;
+					case AND:
+						cpu->r[Rd] = cpu->Res;
+						break;
+					case NOT:
+						cpu->r[Rd] = cpu->Res;
+						break;
+					// case TRAP:
+					case LDR:
+					case LD:
+						cpu->r[Rd] = cpu->MDR;
+						printf("cpu->r[%d]: %4X\n\n", Rd, cpu->r[Rd]);
+						cc = cpu->r[Rd];
+						chooseFlag (cpu, cc);
+						break;
+					case LEA:
+						cpu->r[Rd] = cpu->PC + sext9(immed_offset);
+						cc = cpu->r[Rd];
+						chooseFlag (cpu, cc);
+						break;
+					case ST:
+						memory[cpu->MAR] = cpu->MDR;
+					// case JMP:
+					// case BR:
+
+						break;
+                    // write back to register or store MDR into memory
+                }
+                // do any clean up here in prep for the next complete cycle
+                state = FETCH;
                 break;
-              }
-              state = FETCH_OP;
-              break;
-            case FETCH_OP:
-              switch (opcode) {
-                case ADD:
-                case AND:
-                  if (!(HIGH_ORDER_BIT_VALUE & cpu->ir)) {
-                    alu->b = cpu->reg_file[Rs2];
-                  } else {
-                    alu->b = sext5 (immed5);
-                  }
-                case NOT:
-                  alu->a = cpu->reg_file[Rs1];
-                  break;
-                case ST:
-                  cpu->mdr = Rd;
-                  break;
-                case LD:
-                  cpu->mdr = memory[cpu->mar];
-                  break;
-                case TRAP:
-                  break;
-              }
-              state = EXECUTE;
-              break;
-            case EXECUTE:
-              switch (opcode) {
-                case ADD:
-                  alu->r = alu->a + alu->b;
-                  setFlags(&cpu, &alu, opcode, Rd);
-                  break;
-                case AND:
-                  alu->r = alu->a & alu->b;
-                  setFlags(&cpu, &alu, opcode, Rd);
-                  break;
-                case NOT:
-                  alu->r = ~alu->a;
-                  setFlags(&cpu, &alu, opcode, Rd);
-                  break;
-                case TRAP:
-					value = trap(cpu, alu, cpu->mar);
-					if (value == 1) {
-						return 0;
-					} else if (value > 1) {
-						charToPrint = (char) value;
-						cpu->out = charToPrint;
-						cpu->reg_file[Rd] = value;
-					}
-                  break;
-                case BR: 
-                  if (BEN) {
-					  printf("\n\n IN BRANCH execute\n\n");
-					  printf("\nPC: %4X ", ((cpu->pc - 1) + 0x3000));
-					  printf("    SEXT(OFFSET9): %4X\n", sext9(cpu->ir & OFFSET9_FIELD));
-					  printf("%4X + %4X = %4X\n\n", ((cpu->pc - 1) + 0x3000), sext9(cpu->ir & OFFSET9_FIELD), ((cpu->pc - 1) + 0x3000) + sext9(cpu->ir & OFFSET9_FIELD));
-                    cpu->pc = (((cpu->pc - 1) + 0x3000) + sext9(cpu->ir & OFFSET9_FIELD)) - 0x3000;
-					printf ("\nPC: %4X\n", cpu->pc);
-                  } else {
-					printf ("\n\nBEN not enabled\n\n");
-				  }
-                  break;
-				case JSRR:
-                case JMP:
-                  cpu->pc = cpu->reg_file[BaseR];
-                  break;
-              }
-              state = STORE;
-              break;
-            case STORE:
-              switch (opcode) {
-                case ADD:
-                case AND:
-                case NOT:
-                  cpu->reg_file[Rd] = alu->r;
-                  break;
-                case ST:
-                  memory[cpu->mar] = cpu->mdr;
-                  break;
-                case LD:
-                  cpu->reg_file[Rd] = cpu->mdr;
-                  setFlags(&cpu, &alu, opcode, Rd);
-                  break;
-				case LEA:
-					cpu->reg_file[Rd] = cpu->pc + sext9(offset9);
-                case TRAP:
-                  break;
-              }
-              state = FETCH;
-				//printf ("\n\n REACHED END\n\n");
-				if (start) start = 0;
-              break;
         }
+        displayScreen(cpu, 0);
+        dialog(cpu);
     }
-	free(nextLine);
+//		int i = 0;
+//		for(i = 0; i < 8;i++){
+//			printf("R%d = %u\n",i, cpu->r[i]);
+//		}
+//		printf("MAR = %u\nIR = %u\nPC = %u\n",cpu->MAR, cpu->ir, cpu->PC);
+}
+
+int main(int argc, char* argv[]){
+
+//	char *temp;
+//	int i;
+	setvbuf(stdout, NULL, _IONBF, 0);
+	isLoaded = 0;
+	memShift = 0;
+	//char *temp;
+	CPU_p cpu = malloc(sizeof(CPU_s));
+	    cpu->r[0] = 0x0000;
+	    cpu->r[1] = 0x0000;
+	    cpu->r[2] = 0x0000;
+	    cpu->r[3] = 0x0000;
+	    cpu->r[4] = 0x0000;
+	    cpu->r[5] = 0x0000;
+	    cpu->r[6] = 0x0000;
+	    cpu->r[7] = 0x0000;
+	    cpu->ir = 0x0000;
+	    cpu->PC = 0x3000;
+	    cpu->MAR = 0x0000;
+	    cpu->MDR = 0x0000;
+	    cpu->A = 0x0000;
+	    cpu->B = 0x0000;
+	    cpu->N = 0;
+	    cpu->Z = 0;
+	    cpu->P = 0;
+		
+		
+	    displayScreen(cpu, memShift);
+	    dialog(cpu);
+//	for(i = 1; i < argc; i++){
+//	 	CPU_p c = malloc(sizeof(CPU_s));
+//		memory[0] = strtol(argv[i], &temp, 16);
+//		memory[4] = 0xA0A0;
+//		controller(c);
+//	}
+	//  for(i = 1; i < argc; i++){
+	//  	memory[i-1] = strtol(argv[i], &temp, 16);
+	// }
+	//  controller(c);
 	return 0;
 }
-
-
-
-void clearMem() {
-	for (int i = 0; i < MAX_MEMORY; i++) {memory[i] = 0x0;}
-}
-
-
-// This is our main function that takes a single hex command from the command line
-// and runs that in the controller. We use the trap command HALT to stop the program after
-// the command runs.
-int main (int argc, char* argv[]) {
-  int n = 1, response = 0;
-  unsigned short newAddress;
-  FILE *infile;
-  char file_name[MAX_MEMORY];
-  char *nextLine = malloc(sizeof(char));
-  char temp_start[MAX_MEMORY];
-	CPU_p cpu = malloc (sizeof(CPU_s));
-	ALU_p alu = malloc (sizeof(ALU_s));
-
-  initializeCPU(&cpu, &alu);
-	
-  while (response != EXIT) {
-    display(&cpu, &alu, 1, 1);
-    scanf("%d", &response);
-    if (response == LOAD) {
-		n = 1;
-		clearMem();
-      printf(" File name: ");
-      scanf("%s", file_name);
-      infile = fopen(file_name, "r");
-      if (infile != NULL) {
-        while (fscanf(infile, "%X", &memory[n-1]) != EOF && n < MAX_MEMORY) { n++; } ;
-      } else {
-        printf("ERROR: File not found. Press <ENTER> to continue.");
-      }
-    } else if (response == STEP) {
-	  controller (cpu, alu, 0);
-	} else if (response == SHOW_MEM) {
-	  printf ("Starting Address: ");
-	  scanf("%X", &newAddress);
-	  
-	  if (newAddress >= START_MEM && newAddress <= (END_MEM - 16)) {
-		  
-		cpu->memory_start = newAddress;
-		display(&cpu, &alu, 1, 1);
-	  } else {
-		printf ("Not a valid address <ENTER> to continue.");
-	  }
-	} else if (response == RUN) {
-		controller (cpu, alu, 1);
-	} else if (response == CLEAR) {
-		initializeCPU(&cpu, &alu);
-	}
-  }
-	
-  free(cpu);
-  free(alu);
-  fclose(infile);
-	return 0;
-}
-
-
-//This is our UI function to display the debug monitor in the console.
-//It takes in the CPU, ALU, and an int showChoices that just changes 
-//whether the console will display the choices bar at the bottom or not.
-//(when using step)
-void display(CPU_p *cpu, ALU_p *alu, int showChoices, int start) {
-  int disp_mem = ((int) (*cpu)->memory_start) - DISPLAY_HELP;
-  if (showChoices) {
-	printf("\n\tWelcome to the LC-3 Simulator Simulator\n");
-  } else {
-	printf("\n\n");
-  }
-  printf("\tRegisters\t\t\tMemory\n");
-  printf("\tR0: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[0], (*cpu)->memory_start, memory[disp_mem]);
-  printf("\tR1: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[1], (*cpu)->memory_start + 1, memory[disp_mem + 1]);
-  printf("\tR2: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[2], (*cpu)->memory_start + 2, memory[disp_mem + 2]);
-  printf("\tR3: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[3], (*cpu)->memory_start + 3, memory[disp_mem + 3]);
-  printf("\tR4: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[4], (*cpu)->memory_start + 4, memory[disp_mem + 4]);
-  printf("\tR5: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[5], (*cpu)->memory_start + 5, memory[disp_mem + 5]);
-  printf("\tR6: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[6], (*cpu)->memory_start + 6, memory[disp_mem + 6]);
-  printf("\tR7: X%04X\t\t\tX%04X: X%04X\n", (*cpu)->reg_file[7], (*cpu)->memory_start + 7, memory[disp_mem + 7]);
-  printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 8, memory[disp_mem + 8]);
-  printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 9, memory[disp_mem + 9]);
-  printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 10, memory[disp_mem + 10]);
-  printf("\t PC: X%4X\t IR: X%04X\tX%04X: X%04X\n", ((*cpu)->pc - 1) + START_MEM, (*cpu)->ir, (*cpu)->memory_start + 11, memory[disp_mem + 11]);
-  printf("\t  A: X%04X\t  B: X%04X\tX%04X: X%04X\n", (*alu)->a, (*alu)->b, (*cpu)->memory_start + 12, memory[disp_mem + 12]);
-  printf("\tMAR: X%04X\tMDR: X%04X\tX%04X: X%04X\n", (*cpu)->mar, (*cpu)->mdr, (*cpu)->memory_start + 13, memory[disp_mem + 13]);
-  printf("\tCC: N:%i Z:%i P:%i\t\t\tX%04X: X%04X\n", (*cpu)->n, (*cpu)->z, (*cpu)->p, (*cpu)->memory_start + 14, memory[disp_mem + 14]);
-  printf("\t\t\t\t\tX%04X: X%04X\n", (*cpu)->memory_start + 15, memory[disp_mem + 15]);
-  if (showChoices) {
-	printf("Select: 1) Load, 3) Step, 5) Display Mem, 7) Run, 8) Clear, 9)Exit\n");
-  }
-  printf(">");
-}
-
-
-//Used to get everything set up.
-void initializeCPU(CPU_p *cpu, ALU_p *alu) {
-  (*cpu)->reg_file[0] = 0;
-  (*cpu)->reg_file[1] = 1;
-  (*cpu)->reg_file[2] = 2;
-  (*cpu)->reg_file[3] = 3;
-  (*cpu)->reg_file[4] = 4;
-  (*cpu)->reg_file[5] = 5;
-  (*cpu)->reg_file[6] = 6;
-  (*cpu)->reg_file[7] = 0xA;
-  
-  (*cpu)->pc = 1;	//Need to increment PC here so the instructions start at x3001 as to skip
-					//the instruction x3000 at position x3000. It will show the value of x3001
-					//at x3000 though.
-  (*cpu)->ir = 0;
-  (*cpu)->mar = 0;
-  (*cpu)->mdr = 0;
-  (*alu)->a = 0;
-  (*alu)->b = 0;
-  (*alu)->r = 0;
-  (*cpu)->n = 0;
-  (*cpu)->z = 0;
-  (*cpu)->p = 0;
-  (*cpu)->memory_start = START_MEM;
-  memory[31] = END;
-}
-
-
-//A function to reduce complexity of controller, just sets the nzp flags
-//based on the opcode used.
-void setFlags(CPU_p *cpu, ALU_p *alu, Register opcode, Register Rd) {
-  if(opcode == LD) {                  
-    if ((*cpu)->reg_file[Rd] > 0) {
-      (*cpu)->n = 0;
-      (*cpu)->z = 0;
-      (*cpu)->p = 1;
-    } else if ((*cpu)->reg_file[Rd] == 0) {
-      (*cpu)->n = 0;
-      (*cpu)->z = 1;
-      (*cpu)->p = 0;
-    } else {
-      (*cpu)->n = 1;
-      (*cpu)->z = 0;
-      (*cpu)->p = 0;
-    }
-  } else {
-    if ((*alu)->r > 0) {
-      (*cpu)->n = 0;
-      (*cpu)->z = 0;
-      (*cpu)->p = 1;
-    } else if ((*alu)->r == 0) {
-      (*cpu)->n = 0;
-      (*cpu)->z = 1;
-      (*cpu)->p = 0;
-    } else {
-      (*cpu)->n = 1;
-      (*cpu)->z = 0;
-      (*cpu)->p = 0;
-    }
-  }
-}
-
-
