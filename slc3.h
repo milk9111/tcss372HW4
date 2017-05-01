@@ -52,5 +52,5 @@ typedef struct CPU_s{
 	Register N, Z, P;
 	Register ImmFlag;
 	Register IMM5;
-	char out;
+	char *out;
 } CPU_s, *CPU_p;

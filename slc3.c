@@ -4,7 +4,7 @@
  */
 #include "slc3.h"
 
-int controller (CPU_p);
+int controller (CPU_p, int);
 
 int displayScreen (CPU_p, int);
 
@@ -37,6 +37,7 @@ int sext9(int offset9) {
 // the trap vector table for now. Currently exits the HALT trap command.
 int trap(CPU_p cpu, int trap_vector) {
 	int value = 0;
+	char *temp;
 	switch (trap_vector) {
 		case GETC:
 			value = (int) getch();
@@ -45,7 +46,14 @@ int trap(CPU_p cpu, int trap_vector) {
 			printf("");
 			break;
 		case PUTS:
-			printf("%c", cpu->out);
+			//temp = cpu->out;
+			displayScreen(cpu, 0);
+			//for (int i = 0; i < 20; i++, temp++) {
+			//	printf ("%4X\n", *temp);
+			//}
+			//while (*temp) {printf("%c", *temp); temp++;}
+			printf("%s", cpu->out);
+			exit(0);
 			break;
 		case HALT:
 			value = 1;
@@ -129,14 +137,14 @@ int displayScreen(CPU_p cpu, int mem) {
 	printf("\t\tMAR:x%04X  MDR:x%04X     x%X: x%04X\n",cpu->MAR + 0x2FFF,cpu->MDR,i+5, memory[14 + mem]);
 	printf("\t\tCC: N: %d  Z: %01d P: %d      x%X: x%04X\n",cpu->N,cpu->Z,cpu->P,i+6, memory[15 + mem]);
 	printf("\t\t\t\t\t x%X: x%04X\n",i+7, memory[16 + mem]);
-	printf("  Select: 1)Load, 3)Step, 5)Display Mem, 9)Exit\n");
+	printf("  Select: 1)Load, 3)Step, 5)Display Mem, 7)Run, 9)Exit\n");
 	return 0;
 }
 
 
 int dialog(CPU_p cpu) {
 	//int isTrue = 0;
-	int opNum = 0;
+	int opNum = 0, isRunning = 0;
 	char fileName[100];
 	FILE* inputFile;
 		while (opNum != 9) {
@@ -163,7 +171,7 @@ int dialog(CPU_p cpu) {
 					break;
 				case 3:
 					if (isLoaded == 1) {
-						controller(cpu);
+						controller(cpu, 0);
 						opNum = 0;
 					} else {
 						printf("No file loaded!");
@@ -187,6 +195,9 @@ int dialog(CPU_p cpu) {
 
 					//dialog(cpu);
 					break;
+				case 7:
+					controller(cpu, 1);
+					break;
 				case 9:
 					printf("Simulation Terminated.");
 					break;
@@ -197,18 +208,20 @@ int dialog(CPU_p cpu) {
 
 
 
-int controller (CPU_p cpu) {
+int controller (CPU_p cpu, int isRunning) {
     // check to make sure both pointers are not NULL
     // do any initializations here
 		unsigned int state;
 		short cc;
 	unsigned int opcode, Rd, Rs1, Rs2, immed_offset, BaseR;	// fields for the IR
 	char charToPrint = ' ';
+	char *temp;
 	int value = 0;
     state = FETCH;
 		int j;
 		//for(;;){
-    for (j = 0;j < 6;j++) {
+			//j = 0;j < 6;j++
+    for (;;) {
         switch (state) {
             case FETCH: // microstates 18, 33, 35 in the book
                 //printf("Here in FETCH\n");
@@ -245,7 +258,7 @@ int controller (CPU_p cpu) {
 
 				//0x01ff
 				Rs1 = cpu->ir & 0x01ff;
-				Rs1 = (short)Rs1 >> 5;
+				Rs1 = (short)Rs1 >> 6;
 
 				//0x0007
 				Rs2 = cpu->ir & 0x0007;
@@ -302,8 +315,11 @@ int controller (CPU_p cpu) {
 						break;
 					case ADD:
 						if(0x0020 & cpu->ir){ //0000|0000|0010|0000
+						printf("Rs1: %d\n", Rs1);
 							cpu->A = cpu->r[Rs1];
+							printf ("A: %d\n", cpu->A);
 							cpu->B = (immed_offset & 0x001f);
+							printf ("B: %d\n", cpu->B);
 						} else{
 							cpu->A = cpu->r[Rs1];
 							cpu->B = cpu->r[Rs2];
@@ -342,13 +358,16 @@ int controller (CPU_p cpu) {
 						//printf("cpu->b is %X", (cpu->B));
 						// checks for negative addition
 						if (cpu->A < 0) {
+							printf("-A\n");
 							cpu->Res = -(cpu->A) + (cpu->B);
-               
 						} else if (cpu->B < 0) {
+							printf("-B\n");
 							cpu->Res = (cpu->A) -(cpu->B);
 						} else if ((cpu->A < 0) & (cpu->B < 0)) {
+							printf("-A -B\n");
 							cpu->Res = -(cpu->A) -(cpu->B);
 						} else {
+							printf ("A B\n");
 							cpu->Res = (cpu->A) + (cpu->B);
 						}
 						//setFlags(cpu, 0, 0, 0);
@@ -376,6 +395,23 @@ int controller (CPU_p cpu) {
 						chooseFlag (cpu, cc);
 						break;
 					case TRAP:
+						switch (cpu->MAR) {
+							case PUTS:
+								//unsigned short temp = memory[(cpu->r[0] - 0x2FFF)];
+								//while (memory[temp] != 0) temp++;
+								//printf("%d\n", cpu->r[0] - 0x3000);
+								//exit(0);
+								for(int i = 46; i < 70; i++) {
+									printf ("%c\n", (char) memory[i]);
+								}
+								//printf ("%d\n", cpu->r[0] - 0x2FFF);
+								cpu->out = (char *) memory[(cpu->r[0] - 0x2FFF)];
+								printf ("%p\n", ((char *) memory) + (cpu->r[0] - 0x2FFF));
+								printf("%p\n", cpu->out);
+								//printf("%c\n", *(cpu->out));
+								
+								break;
+						}
 						cpu->PC = cpu->MDR;
 						value = trap(cpu, cpu->MAR);
 						cpu->PC = cpu->r[7];
@@ -384,7 +420,7 @@ int controller (CPU_p cpu) {
 							return 0;
 						} else if (value > 1) {
 							charToPrint = (char) value;
-							cpu->out = charToPrint;
+							//cpu->out = charToPrint;
 							cpu->r[Rd] = value;
 						}
 						//trap((int) (immed_offset & 0x00ff));
@@ -451,8 +487,10 @@ int controller (CPU_p cpu) {
                 state = FETCH;
                 break;
         }
-        displayScreen(cpu, 0);
-        dialog(cpu);
+		if (!isRunning) {
+			displayScreen(cpu, 0);
+			dialog(cpu);
+		}
     }
 //		int i = 0;
 //		for(i = 0; i < 8;i++){
@@ -469,6 +507,7 @@ int main(int argc, char* argv[]){
 	isLoaded = 0;
 	memShift = 0;
 	//char *temp;
+	char *temp = "abcde";
 	CPU_p cpu = malloc(sizeof(CPU_s));
 	    cpu->r[0] = 0x0000;
 	    cpu->r[1] = 0x0000;
