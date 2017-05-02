@@ -22,7 +22,7 @@
 
 
 		.ORIG x3000
-			LEA R1, HELLO
+			LEA R1, PRESSKEY
 	AGAIN	 	LDR R2, R1, #0
 			BRz NEXT
 			ADD R1, R1, #1
@@ -69,14 +69,13 @@ JSRR R7
 			STR R3, R1, #0		; Store contents of R3 back into Array
 			ADD R1, R1, #1		; Increment to next index [R1 + 1]
 			BR LOOP
-			
-
+			RET
 
 	DONE
 			
 
 			
-			LEA R0, HELLO   	 ; 
+			LEA R0, PRESSKEY   	 ; 
 			PUTS		 	 ; Printing Hello
 			GETC
 			LEA R0, NAME		 ;
@@ -86,6 +85,6 @@ JSRR R7
 KEY		.FILL #-3
 NEGENTER	.FILL xFFF6	
 PROMPT		.STRINGZ "Please enter your name: "
-HELLO 		.STRINGZ "Press any key to continue\n"
+PRESSKEY	.STRINGZ "Press any key to continue\n"
 NAME		.BLKW #20 
 		.END

@@ -3,11 +3,11 @@
 //	AGAIN                   3001
 //	AGAIN2                  3009
 //	CONT                    3010
-//	DONE                    3025
-//	HELLO                   3046
-//	KEY                     302B
+//	DONE                    3026
+//	KEY                     302C
 //	LOOP                    301D
-//	NAME                    3061
-//	NEGENTER                302C
+//	NAME                    3062
+//	NEGENTER                302D
 //	NEXT                    3005
-//	PROMPT                  302D
+//	PRESSKEY                3047
+//	PROMPT                  302E
