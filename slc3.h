@@ -21,6 +21,7 @@
 #define LDR 6
 #define LEA 14
 #define ST 3
+#define STR 7
 #define JMP 12
 #define JSRR 4
 #define BR 0
@@ -53,4 +54,5 @@ typedef struct CPU_s{
 	Register ImmFlag;
 	Register IMM5;
 	char *out;
+	char gotC;
 } CPU_s, *CPU_p;

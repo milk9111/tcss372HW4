@@ -37,22 +37,23 @@ int sext9(int offset9) {
 // the trap vector table for now. Currently exits the HALT trap command.
 int trap(CPU_p cpu, int trap_vector) {
 	int value = 0;
+	int i = 0;
 	char *temp;
 	switch (trap_vector) {
 		case GETC:
 			value = (int) getch();
 			break;
 		case OUT:
-			printf("");
+			printf("%c", cpu->gotC);
 			break;
 		case PUTS:
-        int i;
-        i = 0;
-        while ((temp)) {
-          temp = memory[(cpu->r[0] - 0x2FFF + i)];
-          printf("%c", (temp));
-          i++;
-        }
+			i = 0;
+			temp = memory[(cpu->r[0] - 0x2FFF + i)];
+			while ((temp)) {  
+			  printf("%c", (temp));
+			  i++;
+			  temp = memory[(cpu->r[0] - 0x2FFF + i)];
+			}
 			break;
 		case HALT:
 			value = 1;
@@ -64,7 +65,7 @@ int trap(CPU_p cpu, int trap_vector) {
 
 
 void chooseFlag (CPU_p cpu, int cc) {
-	printf ("\n\n IN chooseFlag \n\n");
+	//printf ("\n\n IN chooseFlag \n\n");
 	if (cc < 0x0000){
 		setFlags(cpu, 1, 0, 0);
 	}
@@ -78,7 +79,7 @@ void chooseFlag (CPU_p cpu, int cc) {
 	
 
 void setFlags (CPU_p cpu, unsigned int neg, unsigned int zero, unsigned int pos) {
-	printf ("\n\n IN setFlags \n\n");
+	//printf ("\n\n IN setFlags \n\n");
 	cpu->N = neg;
 	cpu->Z = zero;
 	cpu->P = pos;
@@ -196,6 +197,7 @@ int dialog(CPU_p cpu) {
 					break;
 				case 7:
 					controller(cpu, 1);
+					displayScreen(cpu, 0);
 					break;
 				case 9:
 					printf("Simulation Terminated.");
@@ -265,7 +267,7 @@ int controller (CPU_p cpu, int isRunning) {
 				//0x01ff
 				immed_offset = cpu->ir & 0x01ff;
 				
-				printf ("\n\n IR: %4X\n\n", cpu->ir);
+				//printf ("\n\n IR: %4X\n\n", cpu->ir);
 				BaseR = (cpu->ir & 0x01C0) >> 6;
 
                 // make sure opcode is in integer form
@@ -295,6 +297,12 @@ int controller (CPU_p cpu, int isRunning) {
 						cpu->MAR = (cpu->PC - 0x2FFF) + sext9(immed_offset);
 						//memory[cpu->PC + immed-offset] = Rd
 						break;
+					case STR:
+						//printf ("BaseR: %d\n", BaseR);
+						//printf ("reg_file[BaseR]: %4X\n", cpu->r[BaseR]);
+						//printf ("offset6: %d\n", sext6(immed_offset));
+						cpu->MAR = (cpu->r[BaseR] - 0x2FFF) + sext6(immed_offset);
+						break;
 					case TRAP:
 						cpu->MAR = immed_offset & 0x00ff;
 						break;
@@ -311,11 +319,11 @@ int controller (CPU_p cpu, int isRunning) {
 						break;
 					case ADD:
 						if(0x0020 & cpu->ir){ //0000|0000|0010|0000
-						printf("Rs1: %d\n", Rs1);
+					//	printf("Rs1: %d\n", Rs1);
 							cpu->A = cpu->r[Rs1];
-							printf ("A: %d\n", cpu->A);
+							//printf ("A: %d\n", cpu->A);
 							cpu->B = (immed_offset & 0x001f);
-							printf ("B: %d\n", cpu->B);
+							//printf ("B: %d\n", cpu->B);
 						} else{
 							cpu->A = cpu->r[Rs1];
 							cpu->B = cpu->r[Rs2];
@@ -334,8 +342,12 @@ int controller (CPU_p cpu, int isRunning) {
 					case NOT:
 						cpu->A = cpu->r[Rs1];
 						break;
+					case STR:
 					case ST:
 						cpu->MDR = cpu->r[Rd];
+						//printf ("SR: %d\n", Rd);
+						//printf ("reg_file[SR]: %4X\n", cpu->r[Rd]);
+						//printf ("MDR: %4X\n", cpu->MDR);
 	// get operands out of registers into A, B of ALU
 	// or get memory for load instr.
 						break;
@@ -354,25 +366,25 @@ int controller (CPU_p cpu, int isRunning) {
 						//printf("cpu->b is %X", (cpu->B));
 						// checks for negative addition
 						if (cpu->A < 0) {
-							printf("-A\n");
+						//	printf("-A\n");
 							cpu->Res = -(cpu->A) + (cpu->B);
 						} else if (cpu->B < 0) {
-							printf("-B\n");
+						//	printf("-B\n");
 							cpu->Res = (cpu->A) -(cpu->B);
 						} else if ((cpu->A < 0) & (cpu->B < 0)) {
-							printf("-A -B\n");
+						//	printf("-A -B\n");
 							cpu->Res = -(cpu->A) -(cpu->B);
 						} else {
-							printf ("A B\n");
+						//	printf ("A B\n");
 							cpu->Res = (cpu->A) + (cpu->B);
 						}
 						//setFlags(cpu, 0, 0, 0);
 						//int g = sizeof(cpu->Res);
 						cc = (short int) cpu->Res;
 						//printf(" Check if cc is negative when it needs to be    %d", cc);
-						printf ("\n\nabove\n\n");
+						//printf ("\n\nabove\n\n");
 						chooseFlag (cpu, cc);
-						printf ("\n\nbelow\n\n");
+						//printf ("\n\nbelow\n\n");
 						break;
 					case AND:
 						cpu->Res = cpu->A & cpu->B;
@@ -393,7 +405,7 @@ int controller (CPU_p cpu, int isRunning) {
 					case TRAP:
 						switch (cpu->MAR) {
 							case PUTS:
-                cpu->out = memory[(cpu->r[0] - 0x2FFF)];
+								cpu->out = memory[(cpu->r[0] - 0x2FFF)];
 								break;
 						}
 						cpu->PC = cpu->MDR;
@@ -403,7 +415,8 @@ int controller (CPU_p cpu, int isRunning) {
 						if (value == 1) {
 							return 0;
 						} else if (value > 1) {
-							charToPrint = (char) value;
+							cpu->r[0] = (char) value;
+							cpu->gotC = (char) value;
 							//cpu->out = charToPrint;
 							cpu->r[Rd] = value;
 						}
@@ -446,11 +459,9 @@ int controller (CPU_p cpu, int isRunning) {
 					case NOT:
 						cpu->r[Rd] = cpu->Res;
 						break;
-					// case TRAP:
 					case LDR:
 					case LD:
 						cpu->r[Rd] = cpu->MDR;
-						printf("cpu->r[%d]: %4X\n\n", Rd, cpu->r[Rd]);
 						cc = cpu->r[Rd];
 						chooseFlag (cpu, cc);
 						break;
@@ -459,12 +470,11 @@ int controller (CPU_p cpu, int isRunning) {
 						cc = cpu->r[Rd];
 						chooseFlag (cpu, cc);
 						break;
+					case STR:
 					case ST:
 						memory[cpu->MAR] = cpu->MDR;
-					// case JMP:
-					// case BR:
-
 						break;
+						
                     // write back to register or store MDR into memory
                 }
                 // do any clean up here in prep for the next complete cycle
@@ -473,7 +483,8 @@ int controller (CPU_p cpu, int isRunning) {
         }
 		if (!isRunning) {
 			displayScreen(cpu, 0);
-			dialog(cpu);
+			scanf("%c", &charToPrint);
+			//dialog(cpu);
 		}
     }
 }
