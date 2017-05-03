@@ -1,6 +1,6 @@
 /*
  * Authors: Connor Lundberg, Daniel Ivanov
- * Date: 4/28/2017
+ * Date: 5/3/2017
  */
 #include "slc3.h"
 
@@ -21,12 +21,18 @@ int isLoaded;
 int memShift;
 
 
+/*
+	This function is the offset6 sign extender.
+*/
 int sext6(int offset6) {
 	if (HIGH_ORDER_BIT_VALUE6 & offset6) return (offset6 | SEXT6_SIGN_EXTEND);
 	else return offset6 & SEXT6_MASK;
 }
 
 
+/*
+	This function is the offset9 sign extender.
+*/
 int sext9(int offset9) {
 	if (HIGH_ORDER_BIT_VALUE9 & offset9) return (offset9 | SEXT9_SIGN_EXTEND);
 	else return offset9;
@@ -64,6 +70,9 @@ int trap(CPU_p cpu, int trap_vector) {
 }
 
 
+/*
+	This is a helper function to choose which CC values to set (N, Z, or, P)
+*/
 void chooseFlag (CPU_p cpu, int cc) {
 	if (cc < 0){
 		setFlags(cpu, 1, 0, 0);
@@ -77,6 +86,9 @@ void chooseFlag (CPU_p cpu, int cc) {
 }
 	
 
+/*
+	This function sets the appropriate flags.
+*/
 void setFlags (CPU_p cpu, unsigned int neg, unsigned int zero, unsigned int pos) {
 	cpu->N = neg;
 	cpu->Z = zero;
@@ -84,6 +96,9 @@ void setFlags (CPU_p cpu, unsigned int neg, unsigned int zero, unsigned int pos)
 }
 
 
+/*
+	This function simulates the GETC trap command in assembly.
+*/
 char getch() {
 	char buf = 0;         
 	struct termios old = {0};         
@@ -105,6 +120,10 @@ char getch() {
 }
 
 
+/*
+	This function displays the debug screen with LOAD, STEP, DISPLAY MEM, RUN, or EXIT
+	commands to use.
+*/
 int displayScreen(CPU_p cpu, int mem) {
   printf("\n\n\n");
 	printf("\t\tWelcome to the LC-3 Simulator Simulator\n\n");
@@ -134,6 +153,10 @@ int displayScreen(CPU_p cpu, int mem) {
 }
 
 
+/*
+	This is the dialog function that provides the functionality to the choices shown in
+	the displayScreen.
+*/
 int dialog(CPU_p cpu) {
 	int opNum = 0, isRunning = 0;
 	char fileName[MAX_FILE_NAME];
@@ -314,11 +337,6 @@ int controller (CPU_p cpu, int isRunning) {
 						chooseFlag (cpu, cc);
 						break;
 					case TRAP:
-						switch (cpu->MAR) {
-							case PUTS:
-//								cpu->out = (int )memory[(cpu->r[0] - CONVERT_TO_DECIMAL)];
-								break;
-						}
 						cpu->PC = cpu->MDR;
 						value = trap(cpu, cpu->MAR);
 						cpu->PC = cpu->r[7];
@@ -419,6 +437,9 @@ void cpuInit(CPU_p cpu) {
 }
 
 
+/*
+	This is the main function that starts the program off.
+*/
 int main(int argc, char* argv[]){
 
 	setvbuf(stdout, NULL, _IONBF, 0);
